@@ -1,5 +1,7 @@
 # 生成产物
 /data/processed/
+# 术语表是人工修订的核心资产，进仓库
+!/data/processed/glossary.tsv
 /data/eval/
 # 大体量原始素材：只提交样本，完整词典/语料本地保存，勿入库
 /data/raw/dictionaries/*.txt

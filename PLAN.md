@@ -202,8 +202,23 @@
 
 ---
 
-## 七、第一步行动
+## 七、当前进度（2026-07-24）
 
-把素材（脱敏后哪怕先给样例片段）放入 `data/raw/`，
-从 `pipeline/normalize.py` 和 `parse_dict.py` 开始写起——
-词典格式确定后，后面每一步都有明确依托。
+- ✅ 阶段 0/1 完成：两本词典入库（藏汉大辞典 78,607 条 → dict.sqlite；
+  格西曲扎 25,363 条 → gexi.sqlite），两本译本对齐
+  （中观决定 634 段 + 宝性论大疏 1,637 段），括号注/科判/叶码自动分层。
+- ✅ 术语表 v0：extract_terms.py 从译例抽出 1,054 条术语对
+  （data/processed/glossary.tsv，人工可编辑，随审校持续修订）。
+- ✅ 阶段 2 跑通：agent/ 三件套（tools.py 检索、translator.py 流水线、
+  prompts/translate.md 译经规范），经 claude CLI 端到端出译文，
+  入行论菩提心愿文试译验证通过（术语约束生效、偈颂四句七言）。
+- ⬜ 阶段 3/4：审校稿导出与反馈回流；留出评测集建基线。
+
+### 使用方式
+
+```bash
+# 只看检索资料包（检查术语/词典/译例召回）
+python3 agent/translator.py --text "藏文…" --packet
+# 完整翻译
+python3 agent/translator.py --file 待译经文.txt --out 译文.md
+```
