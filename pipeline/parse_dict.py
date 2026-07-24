@@ -174,6 +174,7 @@ def _split_senses(para_texts, headword=""):
     joined = " ".join(body)
     # 去掉末尾来源标注
     joined = re.sub(r"[（(]\s*(藏汉大辞典\s*p\.?\s*\d+|甘肃版《藏汉词典》)\s*[)）]?", "", joined)
+    joined = RE_POS.sub("", joined)   # 剥除内联词性标记〔名〕（已单独存入 pos）
     joined = clean_ws(joined)
     if not joined:
         return []
