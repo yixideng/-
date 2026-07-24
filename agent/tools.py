@@ -17,7 +17,7 @@ DICT_DBS = [
     ("藏汉大辞典", ROOT / "data/processed/dict.sqlite"),
     ("格西曲扎", ROOT / "data/processed/gexi.sqlite"),
 ]
-GLOSSARY = ROOT / "data/processed/glossary.tsv"
+GLOSSARY = ROOT / "glossary/glossary.tsv"   # 人工修订的核心资产（进仓库）
 TM_FILES = [
     ROOT / "data/processed/tm_zhongguan.jsonl",
     ROOT / "data/processed/tm_baoxinglun.jsonl",

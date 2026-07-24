@@ -1,7 +1,6 @@
-# 生成产物
+# 可再生的大文件产物（词典库/翻译记忆，脚本随时重建）
 /data/processed/
-# 术语表是人工修订的核心资产，进仓库
-!/data/processed/glossary.tsv
+# 注：人工修订的核心资产不放这里，放 /glossary 与 /review（均进仓库）
 /data/eval/
 # 大体量原始素材：只提交样本，完整词典/语料本地保存，勿入库
 /data/raw/dictionaries/*.txt

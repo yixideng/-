@@ -13,7 +13,10 @@
     python pipeline/extract_terms.py \
         --tm data/processed/tm_zhongguan.jsonl data/processed/tm_baoxinglun.jsonl \
         --dicts data/processed/dict.jsonl data/processed/gexi.jsonl \
-        --out data/processed/glossary.tsv --min-freq 2
+        --out glossary/glossary_auto.tsv --min-freq 2
+
+注意：抽取输出建议写 glossary/glossary_auto.tsv（机器候选），
+人工在 glossary/glossary.tsv（主表，进仓库）里增删修订，避免重跑覆盖手工成果。
 """
 import argparse
 import json
