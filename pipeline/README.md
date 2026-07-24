@@ -21,8 +21,9 @@
 | 脚本 | 作用 |
 |---|---|
 | `normalize.py` | 藏文 NFC 规范化、shad/tsheg 归一、查询键生成（被其他脚本引用） |
-| `parse_dict.py` | 解析混编 HTML 词典 → JSONL；按来源分条，抽词头/来源/页码/词性/义项/标签/异体/例词 |
-| `build_index.py` | JSONL → SQLite（entries 主表 + entries_fts 全文索引 + alt_map 异体映射） |
+| `parse_dict.py` | 解析**藏汉大辞典**（混编 Word-HTML）→ JSONL；按来源分条，抽词头/来源/页码/词性/义项/标签/异体/例词 |
+| `parse_gexi.py` | 解析**格西曲扎藏文词典**（简单 HTML）→ JSONL；体例不同（Ⅰ/Ⅱ、1./2. 义项，﹝梵﹞﹝达﹞标注，@页码），输出同一 Entry schema |
+| `build_index.py` | JSONL → SQLite（entries 主表 + entries_fts 全文索引 + alt_map 异体映射），两本词典各建一个独立库 |
 | `lookup.py` | 命令行查词；也是 Agent 端 `lookup_dict` 工具的参考实现（精确→异体→前缀三级兜底） |
 | `make_sample.py` | 从大文件等距抽样，供格式核对 |
 
@@ -46,13 +47,24 @@ python3 pipeline/build_index.py data/processed/dict.jsonl \
 python3 pipeline/lookup.py "བྱང་ཆུབ་ཀྱི་སེམས"
 ```
 
-## 现状（藏汉大辞典）
+## 现状（两本词典均已入库）
 
-- 记录数：78,607（藏汉大辞典 53,201 / 甘肃版藏汉词典 25,381 / 无来源标注 25）
-- 解析耗时 ~13s，建库耗时 ~数秒，dict.sqlite ~78MB
-- 验证：ཆོས/སངས་རྒྱས/སྟོང་པ་ཉིད/བྱང་ཆུབ་ཀྱི་སེམས 等佛学核心词均正确返回双来源释义
+**藏汉大辞典** → `dict.sqlite`（~78MB，Release asset id 488012632）
+- 78,607 条（藏汉大辞典 53,201 / 甘肃版藏汉词典 25,381 / 无来源标注 25）
 
-## 待办
+**格西曲扎藏文词典** → `gexi.sqlite`（~15MB，Release asset id 488022264）
+- 25,363 条（含标签 6,251 / 含页码 25,201）
 
-- 第二本《格西曲扎藏文词典》：格式可能不同（藏文释义为主），
-  上传后先探格式，再决定复用还是另写解析分支，建成独立的第二个索引。
+两库独立，查询时并查、互补：甘肃版最简明、藏汉大辞典下定义、格西曲扎补同义与梵文对应。
+验证：ཆོས/སངས་རྒྱས/སྟོང་པ་ཉིད/བྱང་ཆུབ་ཀྱི་སེམས 等佛学核心词均正确返回。
+
+## 重建格西曲扎库
+
+```bash
+curl -sSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
+  "https://api.github.com/repos/yixideng/-/releases/assets/488022264" \
+  -o data/raw/dictionaries/gexi_full.txt
+python3 pipeline/parse_gexi.py data/raw/dictionaries/gexi_full.txt --out data/processed/gexi.jsonl --stats
+python3 pipeline/build_index.py data/processed/gexi.jsonl --out data/processed/gexi.sqlite
+python3 pipeline/lookup.py --db data/processed/gexi.sqlite "སངས་རྒྱས"
+```
