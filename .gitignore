@@ -1,0 +1,12 @@
+# 生成产物
+/data/processed/
+/data/eval/
+# 大体量原始素材：只提交样本，完整词典/语料本地保存，勿入库
+/data/raw/dictionaries/*.txt
+/data/raw/dictionaries/*.full.html
+/data/raw/parallel/
+/data/raw/source_texts/
+# Python
+__pycache__/
+*.pyc
+.venv/
