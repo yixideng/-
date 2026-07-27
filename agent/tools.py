@@ -19,6 +19,7 @@ DICT_DBS = [
 ]
 GLOSSARY = ROOT / "glossary/glossary.tsv"   # 人工修订的核心资产（进仓库）
 TM_FILES = [
+    ROOT / "data/processed/tm_gzhanstong_reviewed.jsonl",  # 用户校订·文风范本，优先
     ROOT / "data/processed/tm_zhongguan.jsonl",
     ROOT / "data/processed/tm_baoxinglun.jsonl",
 ]
@@ -81,7 +82,7 @@ _glossary_cache = None
 def load_glossary():
     global _glossary_cache
     if _glossary_cache is None:
-        g = {}
+        raw = {}  # bo -> (zh, freq, human)
         if GLOSSARY.exists():
             for i, line in enumerate(GLOSSARY.open(encoding="utf-8")):
                 if i == 0:
@@ -89,9 +90,13 @@ def load_glossary():
                 parts = line.rstrip("\n").split("\t")
                 if len(parts) >= 3:
                     bo, zh, freq = parts[0], parts[1], int(parts[2])
-                    if bo not in g or freq > g[bo][1]:
-                        g[bo] = (zh, freq)
-        _glossary_cache = g
+                    human = len(parts) >= 4 and "人工校正" in parts[3]
+                    prev = raw.get(bo)
+                    # 人工校正条目永远优先；同类内频次高者胜
+                    if prev is None or (human and not prev[2]) \
+                            or (human == prev[2] and freq > prev[1]):
+                        raw[bo] = (zh, freq, human)
+        _glossary_cache = {k: (v[0], v[1]) for k, v in raw.items()}
     return _glossary_cache
 
 
