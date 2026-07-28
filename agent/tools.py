@@ -81,9 +81,15 @@ _glossary_cache = None
 
 
 def load_glossary():
+    """返回 {藏文: (汉译, 频次, 是否多义)}。
+
+    出处列含「多义」者：该词依语境分义，汉译列以「｜」分隔各义项及判别线索，
+    翻译时**不强制**，只作提示。其余为强制统一的规范译名。
+    人工校正条目永远优先于机器抽取。
+    """
     global _glossary_cache
     if _glossary_cache is None:
-        raw = {}  # bo -> (zh, freq, human)
+        raw = {}  # bo -> (zh, freq, human, multi)
         if GLOSSARY.exists():
             for i, line in enumerate(GLOSSARY.open(encoding="utf-8")):
                 if i == 0:
@@ -91,18 +97,21 @@ def load_glossary():
                 parts = line.rstrip("\n").split("\t")
                 if len(parts) >= 3:
                     bo, zh, freq = parts[0], parts[1], int(parts[2])
-                    human = len(parts) >= 4 and "人工校正" in parts[3]
+                    src = parts[3] if len(parts) >= 4 else ""
+                    human = "人工校正" in src
+                    multi = "多义" in src
                     prev = raw.get(bo)
-                    # 人工校正条目永远优先；同类内频次高者胜
-                    if prev is None or (human and not prev[2]) \
-                            or (human == prev[2] and freq > prev[1]):
-                        raw[bo] = (zh, freq, human)
-        _glossary_cache = {k: (v[0], v[1]) for k, v in raw.items()}
+                    # 多义条目最优先（它本身就是人工裁定的语境规则）
+                    if prev is None or (multi and not prev[3]) \
+                            or (multi == prev[3] and human and not prev[2]) \
+                            or (multi == prev[3] and human == prev[2] and freq > prev[1]):
+                        raw[bo] = (zh, freq, human, multi)
+        _glossary_cache = {k: (v[0], v[1], v[3]) for k, v in raw.items()}
     return _glossary_cache
 
 
 def scan_glossary(bo_text: str, max_len=8):
-    """在一段藏文上最长匹配术语表，返回 [(藏文, 规范汉译, 频次)]。"""
+    """在一段藏文上最长匹配术语表，返回 [(藏文, 汉译, 频次, 是否多义)]。"""
     g = load_glossary()
     syls = syllables(bo_text)
     hits, i, n = [], 0, len(syls)
@@ -114,8 +123,8 @@ def scan_glossary(bo_text: str, max_len=8):
                 matched = cand
                 break
         if matched:
-            zh, freq = g[matched]
-            hits.append((matched, zh, freq))
+            zh, freq, multi = g[matched]
+            hits.append((matched, zh, freq, multi))
             i += len(matched.split("་"))
         else:
             i += 1

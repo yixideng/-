@@ -52,12 +52,19 @@ def build_packet(text: str) -> str:
 
     # 术语约束（全篇扫描）
     glo = tools.scan_glossary(text)
+    fixed = [g for g in glo if not g[3]]
+    multi = [g for g in glo if g[3]]
     lines.append("\n## 术语约束（必须采用的译法）\n")
-    if glo:
-        for bo, zh, freq in glo:
+    if fixed:
+        for bo, zh, freq, _ in fixed:
             lines.append(f"- {bo} → **{zh}**（本传承译本中出现 {freq} 次）")
     else:
         lines.append("（本段未命中术语表）")
+
+    if multi:
+        lines.append("\n## 多义词（依语境择一，非强制；判别线索见括号）\n")
+        for bo, zh, _, _ in multi:
+            lines.append(f"- {bo} → {zh}")
 
     # 词典释义：对术语表未覆盖的多音节词查词典
     covered = {g[0] for g in glo}
