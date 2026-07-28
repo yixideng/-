@@ -26,7 +26,10 @@ PROMPT_FILE = ROOT / "agent/prompts/translate.md"
 
 def split_segments(text: str, max_shad=8):
     """按 shad 分句，再把若干句聚成段（偈颂四句约两 shad 一句）。"""
-    parts = [p.strip() for p in re.split(r"(?<=[།༎])", text) if p.strip()]
+    # 按 shad 切句；双 shad「། །」会把后一个 shad 甩到下句开头，需剥掉
+    parts = [p.strip().lstrip("།༎ ").strip()
+             for p in re.split(r"(?<=[།༎])", text)]
+    parts = [p for p in parts if p]
     segs, cur, cnt = [], [], 0
     for p in parts:
         cur.append(p)
