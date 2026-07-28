@@ -46,6 +46,7 @@ python3 pipeline/align.py data/raw/parallel/sample1_baoxinglun.txt --source "宝
 python3 pipeline/align.py data/raw/parallel/sample2_zhongguan.txt --source "极广胜乘中观决定" --out data/processed/tm_zhongguan.jsonl
 # 用户校订·文风范本（对照源在 review/，进 Git）
 python3 pipeline/align.py review/gzhanstong_reviewed_parallel.txt --source "他空中观校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_reviewed.jsonl
+python3 pipeline/align.py review/gzhanstong_2.0_parallel.txt --source "他空中观2.0论体校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_2.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
