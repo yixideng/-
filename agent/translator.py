@@ -127,7 +127,7 @@ def main():
     cmd = ["claude", "-p"]
     if args.model:
         cmd += ["--model", args.model]
-    r = subprocess.run(cmd, input=packet, capture_output=True, text=True, timeout=600)
+    r = subprocess.run(cmd, input=packet, capture_output=True, text=True, timeout=3000)
     out = r.stdout.strip() or r.stderr.strip()
     if args.out:
         args.out.write_text(out + "\n", encoding="utf-8")
