@@ -22,6 +22,7 @@ TM_FILES = [
     ROOT / "data/processed/tm_gzhanstong_reviewed.jsonl",  # 用户校订·文风范本，优先
     ROOT / "data/processed/tm_gzhanstong_2.jsonl",         # 同上（2.0 论体）
     ROOT / "data/processed/tm_gzhanstong_22.jsonl",        # 同上（2.2 广说）
+    ROOT / "data/processed/tm_gzhanstong_23.jsonl",        # 同上（2.3 中观异门）
     ROOT / "data/processed/tm_zhongguan.jsonl",
     ROOT / "data/processed/tm_baoxinglun.jsonl",
 ]
