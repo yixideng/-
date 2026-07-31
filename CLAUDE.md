@@ -51,6 +51,7 @@ python3 pipeline/align.py review/gzhanstong_2.2_parallel.txt --source "他空中
 python3 pipeline/align.py review/gzhanstong_2.3_异门_parallel.txt --source "他空中观2.3异门校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_23.jsonl
 python3 pipeline/align.py review/gzhanstong_2.4_蕴界处_parallel.txt --source "他空中观品二蕴界处校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_24.jsonl
 python3 pipeline/align.py review/gzhanstong_2.5_行蕴_parallel.txt --source "他空中观品二行蕴校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_25.jsonl
+python3 pipeline/align.py review/gzhanstong_2.6_性相法_parallel.txt --source "他空中观品二性相法校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_26.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。

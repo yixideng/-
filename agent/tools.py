@@ -25,6 +25,7 @@ TM_FILES = [
     ROOT / "data/processed/tm_gzhanstong_23.jsonl",        # 同上（2.3 中观异门）
     ROOT / "data/processed/tm_gzhanstong_24.jsonl",        # 同上（品二 蕴界处）
     ROOT / "data/processed/tm_gzhanstong_25.jsonl",        # 同上（品二 行蕴）
+    ROOT / "data/processed/tm_gzhanstong_26.jsonl",        # 同上（品二 性相法）
     ROOT / "data/processed/tm_zhongguan.jsonl",
     ROOT / "data/processed/tm_baoxinglun.jsonl",
 ]
