@@ -22,6 +22,8 @@ sys.path.insert(0, str(ROOT / "agent"))
 import tools  # noqa: E402
 
 PROMPT_FILE = ROOT / "agent/prompts/translate.md"
+# 笔记层（恒常注入）：法义纲要在前（先立框架），句法通则在后
+NOTES_FILES = [ROOT / "notes/法义.md", ROOT / "notes/句法.md"]
 
 
 def split_segments(text: str, max_shad=8):
@@ -46,6 +48,10 @@ def build_packet(text: str) -> str:
     segs = split_segments(text)
     lines = []
     lines.append(PROMPT_FILE.read_text(encoding="utf-8"))
+    # 笔记层：法义纲要 + 句法通则（恒常注入，先于原文，供全篇遵循）
+    for nf in NOTES_FILES:
+        if nf.exists():
+            lines.append("\n---\n" + nf.read_text(encoding="utf-8"))
     lines.append("\n---\n## 待译原文（共 %d 段）\n" % len(segs))
     for i, s in enumerate(segs, 1):
         lines.append(f"[段{i}] {s}")
