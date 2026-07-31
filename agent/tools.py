@@ -32,6 +32,20 @@ TM_FILES = [
 CASE_SUFFIXES = ["འི", "ར", "ས", "འམ", "འང", "ཀྱི", "གྱི", "གི", "ཡི",
                  "ཀྱིས", "གྱིས", "གིས", "ཡིས", "ཏུ", "དུ", "སུ", "ལ", "ན"]
 
+# 黏着于末音节（无 tsheg 分隔）的格助词：如 སྟོང་པ+འི=སྟོང་པའི、ངོ་བོ+ས=ངོ་བོས、
+# དོན་དམ་པ+ར=དོན་དམ་པར。分隔式格助词（གྱི/ཀྱི/ལ/ན…自成音节）由「取更短窗口」处理，
+# 不在此列。扫描术语表时，整词未命中则剥掉末音节的黏着格助词重试一次。
+GLUED_SUFFIXES = ["འིའོ", "འི", "འམ", "འང", "ས", "ར"]
+
+
+def _stem_glued(syls):
+    """若末音节带黏着格助词，返回剥离后的音节列表（长度不变，末节变短）；否则 None。"""
+    last = syls[-1]
+    for suf in GLUED_SUFFIXES:
+        if last.endswith(suf) and len(last) > len(suf):
+            return syls[:-1] + [last[: -len(suf)]]
+    return None
+
 
 def syllables(bo: str):
     return [s for s in re.split(r"[་།༎\s]+", nfc(bo)) if s]
@@ -114,21 +128,32 @@ def load_glossary():
 
 
 def scan_glossary(bo_text: str, max_len=8):
-    """在一段藏文上最长匹配术语表，返回 [(藏文, 汉译, 频次, 是否多义)]。"""
+    """在一段藏文上最长匹配术语表，返回 [(藏文, 汉译, 频次, 是否多义)]。
+
+    最长匹配优先；整词未命中时，剥掉末音节的黏着格助词（如 འི/ས/ར）再试一次，
+    使 སྟོང་པའི→སྟོང་པ、ངོ་བོས→ངོ་བོ、དོན་དམ་པར→དོན་དམ་པ 等带格形也能命中术语约束。
+    """
     g = load_glossary()
     syls = syllables(bo_text)
     hits, i, n = [], 0, len(syls)
     while i < n:
-        matched = None
+        matched, adv = None, 0
         for l in range(min(max_len, n - i), 1, -1):
-            cand = "་".join(syls[i:i + l])
-            if cand in g:
-                matched = cand
+            win = syls[i:i + l]
+            cand = "་".join(win)
+            if cand in g:                       # 原形命中
+                matched, adv = cand, l
                 break
+            stem = _stem_glued(win)             # 末音节剥格助词后命中
+            if stem is not None:
+                scand = "་".join(stem)
+                if scand in g:
+                    matched, adv = scand, l     # 消费原始 l 个音节（含格助词）
+                    break
         if matched:
             zh, freq, multi = g[matched]
             hits.append((matched, zh, freq, multi))
-            i += len(matched.split("་"))
+            i += adv
         else:
             i += 1
     # 去重保序
