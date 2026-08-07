@@ -15,6 +15,7 @@ import argparse
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -130,10 +131,18 @@ def main():
         print(packet)
         return
 
-    cmd = ["claude", "-p"]
+    # 内层 claude 只做「纯文本翻译」：packet 已自带全部资料（指令·笔记·术语·词典·译例·原文）。
+    # 关键防护：①在中性目录运行，避免加载本仓库 CLAUDE.md（其"必须走流水线"会让内层误去递归跑
+    # pipeline、卡在权限询问而非翻译）；②append-system-prompt 明确其唯一任务是输出译文、禁用工具与反问。
+    guard = ("你是藏译汉『译经引擎』。下方用户消息已含全部所需资料"
+             "（系统指令·法义/句法笔记·术语约束·词典释义·参考译例·待译原文）。"
+             "唯一任务：按系统指令逐段输出藏汉逐段对照译文。"
+             "严禁调用任何工具、运行脚本或本仓库流水线，严禁询问权限或反问，直接输出译文。")
+    cmd = ["claude", "-p", "--append-system-prompt", guard]
     if args.model:
         cmd += ["--model", args.model]
-    r = subprocess.run(cmd, input=packet, capture_output=True, text=True, timeout=3000)
+    r = subprocess.run(cmd, input=packet, capture_output=True, text=True,
+                       timeout=3000, cwd=tempfile.gettempdir())
     out = r.stdout.strip() or r.stderr.strip()
     if args.out:
         args.out.write_text(out + "\n", encoding="utf-8")
