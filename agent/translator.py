@@ -126,6 +126,15 @@ def _run_claude(prompt: str, model: str, guard: str) -> str:
     return r.stdout.strip() or r.stderr.strip()
 
 
+def _bo_line_count(text: str) -> int:
+    """统计含藏文的行数（藏汉对照的『藏文行』数），用于润色前后段数比对。"""
+    n = 0
+    for ln in (text or "").splitlines():
+        if any(0x0F00 <= ord(c) <= 0x0FFF for c in ln):
+            n += 1
+    return n
+
+
 def build_polish_packet(draft: str, src_text: str) -> str:
     """第二遍润色资料包：润色规范 + 文风笔记 + 术语约束（守住不改）+ 直译稿。"""
     lines = [POLISH_FILE.read_text(encoding="utf-8")]
@@ -176,10 +185,15 @@ def main():
                   "唯一任务：只改汉译行文、不动义理/术语/格式（藏文行照抄），输出润色后的对照全文。"
                   "严禁调用任何工具或反问，直接输出。")
         polished = _run_claude(build_polish_packet(out, text), args.model, guard2)
-        if polished:
-            out = polished
-        else:
+        # 段数校验兜底：润色遍若擅自合并/拆分段落（藏文行数变化），弃用润色、保留直译，避免对照错位。
+        n_draft, n_pol = _bo_line_count(out), _bo_line_count(polished)
+        if not polished:
             print("（润色遍无输出，保留直译稿）", file=sys.stderr)
+        elif n_pol != n_draft:
+            print(f"（润色遍段数漂移：直译 {n_draft} 段→润色 {n_pol} 段，已弃用润色、保留直译稿）",
+                  file=sys.stderr)
+        else:
+            out = polished
 
     if args.out:
         args.out.write_text(out + "\n", encoding="utf-8")
