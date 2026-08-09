@@ -23,8 +23,9 @@ sys.path.insert(0, str(ROOT / "agent"))
 import tools  # noqa: E402
 
 PROMPT_FILE = ROOT / "agent/prompts/translate.md"
-# 笔记层（恒常注入）：法义纲要在前（先立框架），句法通则在后
-NOTES_FILES = [ROOT / "notes/法义.md", ROOT / "notes/句法.md"]
+# 笔记层（恒常注入）：法义纲要在前（先立框架），句法通则次之，文风通则在后
+NOTES_FILES = [ROOT / "notes/法义.md", ROOT / "notes/句法.md", ROOT / "notes/文风.md"]
+POLISH_FILE = ROOT / "agent/prompts/polish.md"
 
 
 def split_segments(text: str, max_shad=8):
@@ -113,11 +114,44 @@ def build_packet(text: str) -> str:
     return "\n".join(lines)
 
 
+# 内层 claude 只做「纯文本任务」：prompt 已自带全部资料。关键防护：①在中性目录运行，避免加载
+# 本仓库 CLAUDE.md（其"必须走流水线"会让内层误去递归跑 pipeline、卡在权限询问而非干活）；
+# ②append-system-prompt 明确其唯一任务、禁用工具与反问。
+def _run_claude(prompt: str, model: str, guard: str) -> str:
+    cmd = ["claude", "-p", "--append-system-prompt", guard]
+    if model:
+        cmd += ["--model", model]
+    r = subprocess.run(cmd, input=prompt, capture_output=True, text=True,
+                       timeout=3000, cwd=tempfile.gettempdir())
+    return r.stdout.strip() or r.stderr.strip()
+
+
+def build_polish_packet(draft: str, src_text: str) -> str:
+    """第二遍润色资料包：润色规范 + 文风笔记 + 术语约束（守住不改）+ 直译稿。"""
+    lines = [POLISH_FILE.read_text(encoding="utf-8")]
+    wind = ROOT / "notes/文风.md"
+    if wind.exists():
+        lines.append("\n---\n" + wind.read_text(encoding="utf-8"))
+    # 术语约束：让润色明确哪些译名必须保持不动
+    glo = tools.scan_glossary(src_text)
+    fixed = [g for g in glo if not g[3]]
+    if fixed:
+        lines.append("\n## 术语约束（润色时一律保持不动）\n")
+        for bo, zh, _, _ in fixed:
+            lines.append(f"- {bo} → **{zh}**")
+    lines.append("\n---\n## 待润色·直译稿（藏文行照抄不动，仅重写汉译行）\n")
+    lines.append(draft)
+    lines.append("\n---\n请按【译文润色规范】只改行文、不动义理，输出润色后的藏汉逐段对照全文。")
+    return "\n".join(lines)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--text")
     ap.add_argument("--file", type=Path)
     ap.add_argument("--packet", action="store_true", help="只输出资料包，不调用模型")
+    ap.add_argument("--polish", action="store_true",
+                    help="翻译后再跑一遍『文风润色』（两阶段：准确直译→定稿体润色）")
     ap.add_argument("--out", type=Path)
     ap.add_argument("--model", default="")
     args = ap.parse_args()
@@ -131,19 +165,22 @@ def main():
         print(packet)
         return
 
-    # 内层 claude 只做「纯文本翻译」：packet 已自带全部资料（指令·笔记·术语·词典·译例·原文）。
-    # 关键防护：①在中性目录运行，避免加载本仓库 CLAUDE.md（其"必须走流水线"会让内层误去递归跑
-    # pipeline、卡在权限询问而非翻译）；②append-system-prompt 明确其唯一任务是输出译文、禁用工具与反问。
-    guard = ("你是藏译汉『译经引擎』。下方用户消息已含全部所需资料"
-             "（系统指令·法义/句法笔记·术语约束·词典释义·参考译例·待译原文）。"
-             "唯一任务：按系统指令逐段输出藏汉逐段对照译文。"
-             "严禁调用任何工具、运行脚本或本仓库流水线，严禁询问权限或反问，直接输出译文。")
-    cmd = ["claude", "-p", "--append-system-prompt", guard]
-    if args.model:
-        cmd += ["--model", args.model]
-    r = subprocess.run(cmd, input=packet, capture_output=True, text=True,
-                       timeout=3000, cwd=tempfile.gettempdir())
-    out = r.stdout.strip() or r.stderr.strip()
+    guard1 = ("你是藏译汉『译经引擎』。下方用户消息已含全部所需资料"
+              "（系统指令·法义/句法/文风笔记·术语约束·词典释义·参考译例·待译原文）。"
+              "唯一任务：按系统指令逐段输出藏汉逐段对照译文。"
+              "严禁调用任何工具、运行脚本或本仓库流水线，严禁询问权限或反问，直接输出译文。")
+    out = _run_claude(packet, args.model, guard1)
+
+    if args.polish:
+        guard2 = ("你是藏译汉定稿润色师。下方已含直译稿·文风笔记·术语约束。"
+                  "唯一任务：只改汉译行文、不动义理/术语/格式（藏文行照抄），输出润色后的对照全文。"
+                  "严禁调用任何工具或反问，直接输出。")
+        polished = _run_claude(build_polish_packet(out, text), args.model, guard2)
+        if polished:
+            out = polished
+        else:
+            print("（润色遍无输出，保留直译稿）", file=sys.stderr)
+
     if args.out:
         args.out.write_text(out + "\n", encoding="utf-8")
         print(f"译文已写入 {args.out}")
