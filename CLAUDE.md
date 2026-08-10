@@ -70,6 +70,7 @@ python3 pipeline/align.py review/gzhanstong_2.9_五乘无为果_parallel.txt --s
 python3 pipeline/align.py review/gzhanstong_2.10_五基_parallel.txt --source "他空中观品二五基校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_210.jsonl
 python3 pipeline/align.py review/gzhanstong_2.11_四谛_parallel.txt --source "他空中观品二四谛校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_211.jsonl
 python3 pipeline/align.py review/gzhanstong_2.12_品二末_parallel.txt --source "他空中观品二末段校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_212.jsonl
+python3 pipeline/align.py review/gzhanstong_3.2_常义周遍义_parallel.txt --source "他空中观品三常义周遍义校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_32.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
