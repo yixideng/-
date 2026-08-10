@@ -33,6 +33,7 @@ TM_FILES = [
     ROOT / "data/processed/tm_gzhanstong_211.jsonl",       # 同上（品二 观察四谛/苦集道灭·细微集谛）
     ROOT / "data/processed/tm_gzhanstong_212.jsonl",       # 同上（品二末 分别无分别四门·胜义四谛皆法身相·果末）
     ROOT / "data/processed/tm_gzhanstong_32.jsonl",        # 同上（品三 界之常义·周遍义）
+    ROOT / "data/processed/tm_gzhanstong_33.jsonl",        # 同上（品三 界之觉义·一切相·自性涅槃）
     ROOT / "data/processed/tm_zhongguan.jsonl",
     ROOT / "data/processed/tm_baoxinglun.jsonl",
 ]
