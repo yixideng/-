@@ -159,8 +159,8 @@ def main():
     ap.add_argument("--text")
     ap.add_argument("--file", type=Path)
     ap.add_argument("--packet", action="store_true", help="只输出资料包，不调用模型")
-    ap.add_argument("--polish", action="store_true",
-                    help="翻译后再跑一遍『文风润色』（两阶段：准确直译→定稿体润色）")
+    ap.add_argument("--polish", action=argparse.BooleanOptionalAction, default=True,
+                    help="翻译后再跑一遍『文风润色』（默认开；--no-polish 关）。两阶段：准确直译→定稿体润色")
     ap.add_argument("--out", type=Path)
     ap.add_argument("--model", default="")
     args = ap.parse_args()
@@ -178,15 +178,16 @@ def main():
               "（系统指令·法义/句法/文风笔记·术语约束·词典释义·参考译例·待译原文）。"
               "唯一任务：按系统指令逐段输出藏汉逐段对照译文。"
               "严禁调用任何工具、运行脚本或本仓库流水线，严禁询问权限或反问，直接输出译文。")
-    out = _run_claude(packet, args.model, guard1)
+    draft = _run_claude(packet, args.model, guard1)   # 第一遍：准确直译
+    out = draft
 
     if args.polish:
         guard2 = ("你是藏译汉定稿润色师。下方已含直译稿·文风笔记·术语约束。"
                   "唯一任务：只改汉译行文、不动义理/术语/格式（藏文行照抄），输出润色后的对照全文。"
                   "严禁调用任何工具或反问，直接输出。")
-        polished = _run_claude(build_polish_packet(out, text), args.model, guard2)
+        polished = _run_claude(build_polish_packet(draft, text), args.model, guard2)
         # 段数校验兜底：润色遍若擅自合并/拆分段落（藏文行数变化），弃用润色、保留直译，避免对照错位。
-        n_draft, n_pol = _bo_line_count(out), _bo_line_count(polished)
+        n_draft, n_pol = _bo_line_count(draft), _bo_line_count(polished)
         if not polished:
             print("（润色遍无输出，保留直译稿）", file=sys.stderr)
         elif n_pol != n_draft:
@@ -198,6 +199,11 @@ def main():
     if args.out:
         args.out.write_text(out + "\n", encoding="utf-8")
         print(f"译文已写入 {args.out}")
+        # 润色时把纯直译稿一并另存，供日后「机器直译↔用户校正版」diff 提炼文风规律。
+        if args.polish and out is not draft:
+            draft_path = args.out.with_name(args.out.stem + "_直译" + args.out.suffix)
+            draft_path.write_text(draft + "\n", encoding="utf-8")
+            print(f"（纯直译稿另存 {draft_path}）")
     else:
         print(out)
 

@@ -80,8 +80,12 @@ python3 pipeline/align.py review/gzhanstong_2.12_品二末_parallel.txt --source
 # 只看检索到的资料（术语/词典/译例），核对召回质量：
 python3 agent/translator.py --text "藏文…" --packet
 
-# 完整翻译：
+# 完整翻译（默认两阶段：准确直译 → 定稿体润色）：
 python3 agent/translator.py --file 待译.txt --out 译文.md
+#   ↑ 默认 --polish：第一遍注入 prompts/translate.md+notes 三层(法义/句法/文风)+术语/词典/译例出直译；
+#     第二遍按 prompts/polish.md+notes/文风.md 只改行文出定稿体；段数校验兜底(漂移则退回直译)。
+#     纯直译稿会一并另存为 *_直译.md（供日后「机器稿↔校正版」diff 提炼文风）。
+python3 agent/translator.py --file 待译.txt --out 译文.md --no-polish   # 只要纯直译（跳过润色遍）
 # 选模型：--model claude-opus-4-8（主力，性价比高）或 --model claude-fable-5（难点/终校）
 ```
 
