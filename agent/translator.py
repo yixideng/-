@@ -28,21 +28,45 @@ NOTES_FILES = [ROOT / "notes/法义.md", ROOT / "notes/句法.md", ROOT / "notes
 POLISH_FILE = ROOT / "agent/prompts/polish.md"
 
 
-def split_segments(text: str, max_shad=8):
-    """按 shad 分句，再把若干句聚成段（偈颂四句约两 shad 一句）。"""
-    # 按 shad 切句；双 shad「། །」会把后一个 shad 甩到下句开头，需剥掉
+# 藏文终结词（rdzogs tshig / slar bsdu）：句子真正说完的标志（≈句号）。
+# 一 shad 分句若以下列音节收尾（或以 འོ 收尾，如 པའོ/བའོ/ཟིན་ཏོའོ…），即视为句末。
+# 而 དང༌/ཞིང/ཏེ/ལ/ཕྱིར/ལྟར… 等只是句内接续，不算句末——故不会在其后腰斩。
+TERMINATIVES = {"ནོ", "བོ", "ཏོ", "དོ", "རོ", "སོ", "ངོ", "གོ", "མོ", "ལོ", "འོ"}
+
+
+def _shad_clauses(block: str):
+    """把一段按 shad 切成分句；双 shad「། །」的第二个 shad 会甩到下句开头，剥掉。"""
     parts = [p.strip().lstrip("།༎ ").strip()
-             for p in re.split(r"(?<=[།༎])", text)]
-    parts = [p for p in parts if p]
-    segs, cur, cnt = [], [], 0
-    for p in parts:
-        cur.append(p)
-        cnt += 1
-        if cnt >= max_shad:
+             for p in re.split(r"(?<=[།༎])", block)]
+    return [p for p in parts if p]
+
+
+def _sentence_end(clause: str) -> bool:
+    """该 shad 分句是否以终结词收尾（即整句已说完）。"""
+    syls = [s for s in re.split(r"[་༌\s]+", clause.rstrip("།༎ ")) if s]
+    return bool(syls) and (syls[-1] in TERMINATIVES or syls[-1].endswith("འོ"))
+
+
+def split_segments(text: str, min_shad=3, max_shad=18):
+    """分段：先尊重原文换行（自然段），再于段内**只在句末终结词处断句**，
+    硬上限 max_shad 仅作超长兜底——绝不把一句话腰斩。
+
+    旧版按固定 shad 数硬切，会把『…གཞི་བྱེད་པའི་ཕྱིར། │ སྣོད་དང་མཚུངས་པ་ཡིན…སོ།』
+    在 ཕྱིར 处切开，谓语「与器相似」被甩到下段开头成残句。现改为：累计分句，
+    达到下限且遇终结词才断（或到硬上限强断），保证每段都止于一个完整句。"""
+    segs = []
+    # 原文换行是作者给的自然段边界，优先采信；无换行则整体为一块
+    blocks = [b.strip() for b in text.splitlines() if b.strip()] or [text]
+    for block in blocks:
+        cur, cnt = [], 0
+        for p in _shad_clauses(block):
+            cur.append(p)
+            cnt += 1
+            if (cnt >= min_shad and _sentence_end(p)) or cnt >= max_shad:
+                segs.append(" ".join(cur))
+                cur, cnt = [], 0
+        if cur:  # 段末残余（含换行边界），成段
             segs.append(" ".join(cur))
-            cur, cnt = [], 0
-    if cur:
-        segs.append(" ".join(cur))
     return segs
 
 
