@@ -47,25 +47,33 @@ def _sentence_end(clause: str) -> bool:
     return bool(syls) and (syls[-1] in TERMINATIVES or syls[-1].endswith("འོ"))
 
 
-def split_segments(text: str, min_shad=3, max_shad=18):
-    """分段：先尊重原文换行（自然段），再于段内**只在句末终结词处断句**，
-    硬上限 max_shad 仅作超长兜底——绝不把一句话腰斩。
+def split_segments(text: str, max_shad=24):
+    """分段：**以原文自然段（换行）为单位，一段=一组对照**。
+    单段整体保留（含段内「…ཡིན་ནོ། །ཞེས་པ…པའོ།」这类中途句号＋收束句），
+    不因段内的句号而拆——与用户校订本「根颂／释论各自成组」的排版一致。
+
+    仅当某自然段超长（shad 分句数 > max_shad）时，才兜底断开，
+    且**只断在句末终结词处**（rdzogs tshig，绝不腰斩）。无换行的整块输入
+    （如直接粘贴的一大段）亦按同规则：先整体，超长再按句末断。
 
     旧版按固定 shad 数硬切，会把『…གཞི་བྱེད་པའི་ཕྱིར། │ སྣོད་དང་མཚུངས་པ་ཡིན…སོ།』
-    在 ཕྱིར 处切开，谓语「与器相似」被甩到下段开头成残句。现改为：累计分句，
-    达到下限且遇终结词才断（或到硬上限强断），保证每段都止于一个完整句。"""
+    在 ཕྱིར 处腰斩，谓语「与器相似」被甩到下段成残句；故彻底改为自然段优先。"""
     segs = []
     # 原文换行是作者给的自然段边界，优先采信；无换行则整体为一块
     blocks = [b.strip() for b in text.splitlines() if b.strip()] or [text]
     for block in blocks:
-        cur, cnt = [], 0
-        for p in _shad_clauses(block):
+        parts = _shad_clauses(block)
+        if len(parts) <= max_shad:            # 常态：自然段整体成一组
+            if parts:
+                segs.append(" ".join(parts))
+            continue
+        cur = []                              # 超长兜底：仅在句末终结词处断
+        for p in parts:
             cur.append(p)
-            cnt += 1
-            if (cnt >= min_shad and _sentence_end(p)) or cnt >= max_shad:
+            if len(cur) >= max_shad and _sentence_end(p):
                 segs.append(" ".join(cur))
-                cur, cnt = [], 0
-        if cur:  # 段末残余（含换行边界），成段
+                cur = []
+        if cur:
             segs.append(" ".join(cur))
     return segs
 
