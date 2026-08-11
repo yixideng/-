@@ -22,6 +22,16 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "agent"))
 import tools  # noqa: E402
 
+# 单字虚词停用表：逐字兜底查词典时跳过这些语法词（格助词/接续/终结/名物化等），
+# 免得把 ནི/དང/ཀྱི/ལ… 也堆进「逐字参考」。实词（如 ཡོངས/དཔྱོད）不在此列，照查。
+PARTICLE_SYLS = {
+    "ནི", "དང", "ཀྱི", "གྱི", "གི", "ཡི", "ཀྱིས", "གྱིས", "གིས", "ཡིས",
+    "ལ", "ན", "ཏུ", "དུ", "སུ", "རུ", "ར", "ས", "འི", "འམ", "འང", "འོ",
+    "སྟེ", "ཏེ", "དེ", "ཅིང", "ཤིང", "ཞིང", "ཅེས", "ཞེས", "ཅེ", "ཞེ",
+    "པ", "བ", "པོ", "བོ", "མོ", "གོ", "ཏོ", "དོ", "ནོ", "རོ", "སོ", "ལོ",
+    "ཡང", "ཀྱང", "ནས", "ལས", "ཞིག", "ཅིག", "ཤིག", "གང", "པར", "བར", "པའི", "བའི",
+}
+
 PROMPT_FILE = ROOT / "agent/prompts/translate.md"
 # 笔记层（恒常注入）：法义纲要在前（先立框架），句法通则次之，文风通则在后
 NOTES_FILES = [ROOT / "notes/法义.md", ROOT / "notes/句法.md", ROOT / "notes/文风.md"]
@@ -136,6 +146,33 @@ def build_packet(text: str) -> str:
         for e in entries[:2]:
             sense = "；".join(e["senses"])[:150]
             lines.append(f"- {word}〔{e['source']}〕{sense}")
+
+    # 逐字参考（兜底·治「术语表词汇有限」）：既未命中术语表、又未作为复合词命中词典的
+    # 「实词单字」，拆开逐字查词典，给模型合成的原料——如 ཡོངས＝周遍、དཔྱོད＝观察 → 周遍观察，
+    # 免得模型在毫无参考时把 དཔྱོད 误读作近形字 སྤྱོད(受用) 而臆造「领受」。
+    covered_syls = set()
+    for g in glo:
+        covered_syls.update(g[0].split("་"))
+    for w, _ in dict_hits:
+        content = [s for s in w.split("་") if s not in PARTICLE_SYLS]
+        if len(content) >= 2:             # 仅「真·多实词复合词」算已覆盖；
+            covered_syls.update(content)  # 单实词+格助词(如 དཔྱོད་ཀྱིས)不算，留给逐字层取 +པ 丰义
+    morph_hits, morph_seen = [], set()
+    for syl in syls:
+        if syl in covered_syls or syl in morph_seen or syl in PARTICLE_SYLS:
+            continue
+        for form in (syl + "་པ", syl):        # 先试动词/名词式(如 དཔྱོད་པ)，再试裸字
+            res = tools.lookup_dict(form)
+            if res:
+                morph_seen.add(syl)
+                sense = "；".join(res[0]["senses"])[:80]
+                morph_hits.append((syl, form, sense))
+                break
+    if morph_hits:
+        lines.append("\n## 逐字参考（复合词未成词条时，供逐字合成；非强制，仅作原料）\n")
+        for syl, form, sense in morph_hits[:20]:
+            tag = f"〔查 {form}〕" if form != syl else ""
+            lines.append(f"- {syl}{tag} → {sense}")
 
     # 相似译例
     lines.append("\n## 参考译例（同一译者已定稿译本，模仿其文体）\n")
