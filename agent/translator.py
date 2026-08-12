@@ -81,14 +81,25 @@ def split_segments(text: str, max_shad=16):
             if parts:
                 segs.append(" ".join(parts))
             continue
-        cur = []                              # 超长兜底：仅在句末终结词处断
+        # 超长段兜底：先按句末终结词切成整句，再贪心地把整句打包成 ≤max_shad 的组。
+        # 这样断点总落在真实句界（如 …གྲུབ་བོ།│རང་རིག་…），不会因「凑够 max_shad 才断」
+        # 而把两段论证挤在一起或越过句界；单句本身超长则整句保留（不腰斩）。
+        sentences, cur = [], []
         for p in parts:
             cur.append(p)
-            if len(cur) >= max_shad and _sentence_end(p):
-                segs.append(" ".join(cur))
+            if _sentence_end(p):
+                sentences.append(cur)
                 cur = []
-        if cur:
-            segs.append(" ".join(cur))
+        if cur:                               # 末尾无终结词的残句自成一句
+            sentences.append(cur)
+        group = []
+        for sent in sentences:
+            if group and len(group) + len(sent) > max_shad:
+                segs.append(" ".join(group))
+                group = []
+            group += sent
+        if group:
+            segs.append(" ".join(group))
     return segs
 
 
