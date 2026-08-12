@@ -211,9 +211,15 @@ def _run_claude(prompt: str, model: str, guard: str) -> str:
 
 
 def _bo_line_count(text: str) -> int:
-    """统计含藏文的行数（藏汉对照的『藏文行』数），用于润色前后段数比对。"""
+    """统计正文对照的『藏文行』数，用于润色前后段数比对。
+
+    只数正文：遇到「校勘/校订/译注」小节标题即停——那节里常引藏文术语（如
+    རྟགས་པ/རྐྱེན），若一并计入会造成假漂移、误弃正确的润色稿。"""
     n = 0
     for ln in (text or "").splitlines():
+        s = ln.lstrip("#＃ 　").strip()
+        if s.startswith(("校勘", "校订", "译注", "按语")):
+            break
         if any(0x0F00 <= ord(c) <= 0x0FFF for c in ln):
             n += 1
     return n
