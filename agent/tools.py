@@ -17,8 +17,13 @@ DICT_DBS = [
     ("藏汉大辞典", ROOT / "data/processed/dict.sqlite"),
     ("格西曲扎", ROOT / "data/processed/gexi.sqlite"),
 ]
-GLOSSARY = ROOT / "glossary/glossary.tsv"   # 人工修订的核心资产（进仓库）
-TM_FILES = [
+# ========== 多项目：共享底座 + 分项目层 ==========
+# 词典(DICT_DBS)与流水线代码 = 两项目共享。
+# 术语库/翻译记忆/笔记 = 「共享基础 + 项目覆盖」：新项目(如时轮)复用胜乘中观积累的
+# 术语知识(只读共享 glossary)，但各自的译例/笔记/新增术语互不写入、互不污染。
+SHARED_GLOSSARY = ROOT / "glossary/glossary.tsv"   # 共享基础术语库（人工核心资产·进仓库）
+
+_GZHANSTONG_TM = [
     ROOT / "data/processed/tm_gzhanstong_reviewed.jsonl",  # 用户校订·文风范本，优先
     ROOT / "data/processed/tm_gzhanstong_2.jsonl",         # 同上（2.0 论体）
     ROOT / "data/processed/tm_gzhanstong_22.jsonl",        # 同上（2.2 广说）
@@ -40,6 +45,54 @@ TM_FILES = [
     ROOT / "data/processed/tm_zhongguan.jsonl",
     ROOT / "data/processed/tm_baoxinglun.jsonl",
 ]
+
+PROJECTS = {
+    # 胜乘中观(他空大中观)——默认项目，沿用现有 notes/ review/ glossary/ 与 tm_gzhanstong_*
+    "gzhanstong": {
+        "name": "胜乘中观(他空大中观)",
+        "glossary": [SHARED_GLOSSARY],
+        "tm": _GZHANSTONG_TM,
+        "notes": [ROOT / "notes/法义.md", ROOT / "notes/句法.md", ROOT / "notes/文风.md"],
+        "review": ROOT / "review",
+    },
+    # 时轮根本续——独立笔记/译例/术语覆盖层；共享 SHARED_GLOSSARY(只读)与两本词典
+    "kalacakra": {
+        "name": "时轮根本续(Kālacakra)",
+        "glossary": [SHARED_GLOSSARY,                       # 共享基础(只读)——复用积累术语
+                     ROOT / "projects/kalacakra/glossary.tsv"],  # 时轮术语覆盖层(时轮专用·优先)
+        "tm": sorted((ROOT / "data/processed").glob("tm_kalacakra_*.jsonl")),
+        "notes": [ROOT / "projects/kalacakra/notes/法义.md",
+                  ROOT / "projects/kalacakra/notes/句法.md",
+                  ROOT / "projects/kalacakra/notes/文风.md"],
+        "review": ROOT / "projects/kalacakra/review",
+    },
+}
+
+PROJECT = "gzhanstong"   # 当前项目；translator.py 依 --project 设定；默认胜乘中观(不影响原有行为)
+
+
+def set_project(name: str):
+    """切换当前项目并清检索缓存。未知项目直接报错。"""
+    global PROJECT, _glossary_cache, _tm_cache
+    if name not in PROJECTS:
+        raise SystemExit(f"未知项目：{name}；可选 {list(PROJECTS)}")
+    PROJECT = name
+    _glossary_cache = None
+    _tm_cache = None
+
+
+def _cfg():
+    return PROJECTS[PROJECT]
+
+
+def project_notes():
+    """当前项目的笔记层文件（供 translator 注入）。"""
+    return _cfg()["notes"]
+
+
+# 向后兼容别名（旧引用仍可用；实际加载走 _cfg()）
+GLOSSARY = SHARED_GLOSSARY
+TM_FILES = _GZHANSTONG_TM
 
 # 常见格助词/接续，剥离后重查（简单形态还原）
 CASE_SUFFIXES = ["འི", "ར", "ས", "འམ", "འང", "ཀྱི", "གྱི", "གི", "ཡི",
@@ -119,9 +172,15 @@ def load_glossary():
     """
     global _glossary_cache
     if _glossary_cache is None:
-        raw = {}  # bo -> (zh, freq, human, multi)
-        if GLOSSARY.exists():
-            for i, line in enumerate(GLOSSARY.open(encoding="utf-8")):
+        # 依当前项目按序读取术语文件：共享基础在前、项目覆盖层在后；
+        # 覆盖层同一藏文词直接盖过基础层（项目专用译名优先），故新项目既复用
+        # 积累术语，又能就本项目语境改写而不影响共享库。
+        merged = {}  # bo -> (zh, freq, human, multi)
+        for gf in _cfg()["glossary"]:
+            if not gf.exists():
+                continue
+            is_overlay = gf != SHARED_GLOSSARY
+            for i, line in enumerate(gf.open(encoding="utf-8")):
                 if i == 0:
                     continue
                 parts = line.rstrip("\n").split("\t")
@@ -130,13 +189,13 @@ def load_glossary():
                     src = parts[3] if len(parts) >= 4 else ""
                     human = "人工校正" in src
                     multi = "多义" in src
-                    prev = raw.get(bo)
-                    # 多义条目最优先（它本身就是人工裁定的语境规则）
-                    if prev is None or (multi and not prev[3]) \
+                    prev = merged.get(bo)
+                    # 覆盖层无条件盖过基础层；同层内按 多义>人工校正>频次 择优
+                    if is_overlay or prev is None or (multi and not prev[3]) \
                             or (multi == prev[3] and human and not prev[2]) \
                             or (multi == prev[3] and human == prev[2] and freq > prev[1]):
-                        raw[bo] = (zh, freq, human, multi)
-        _glossary_cache = {k: (v[0], v[1], v[3]) for k, v in raw.items()}
+                        merged[bo] = (zh, freq, human, multi)
+        _glossary_cache = {k: (v[0], v[1], v[3]) for k, v in merged.items()}
     return _glossary_cache
 
 
@@ -187,7 +246,7 @@ def load_tm():
     global _tm_cache
     if _tm_cache is None:
         segs = []
-        for p in TM_FILES:
+        for p in _cfg()["tm"]:            # 当前项目的翻译记忆（各项目独立，互不检索）
             if p.exists():
                 for line in p.open(encoding="utf-8"):
                     s = json.loads(line)

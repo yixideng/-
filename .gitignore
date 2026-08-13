@@ -11,3 +11,6 @@
 __pycache__/
 *.pyc
 .venv/
+
+# 时轮机器草稿(可再生，不进 git；校订本/笔记/术语覆盖层进 git)
+projects/kalacakra/source_texts/

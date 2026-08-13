@@ -10,6 +10,25 @@
 它会自动：分段 → 查两本词典 → 套用术语表（强制统一译名）→ 检索相似历史译例
 → **注入笔记层（法义纲要 + 句法通则）** → 交给 Claude 出译文。详见 `PLAN.md` 与 `pipeline/README.md`。
 
+## 多项目（同一知识库，多本经论互不污染）
+
+本仓库可**同时翻译多本经论**，用 `--project` 切换。设计＝**共享底座 + 分项目层**：
+
+| 层 | 是否共享 | 说明 |
+|---|---|---|
+| 两本词典 + 流水线代码 | **共享** | 通用，两项目都用 |
+| 术语库 `glossary/glossary.tsv` | **共享（只读基础）** | 积累的术语校正，新项目直接复用 |
+| 翻译记忆(译例)/笔记(法义·句法·文风)/校订本/科判 | **各项目独立** | 文风义理迥异，隔离防带偏 |
+| 项目新增术语 | **各项目覆盖层** | 写进 `projects/<名>/glossary.tsv`，**不写共享库**（这样互不影响）|
+
+已建项目：
+- **`gzhanstong`（默认）**＝胜乘中观(他空大中观)：沿用 `notes/` `review/` `glossary/glossary.tsv` 与 `data/processed/tm_gzhanstong_*`。**不带 --project 时行为与原来完全一致。**
+- **`kalacakra`**＝时轮根本续：`projects/kalacakra/{notes,review,source_texts,glossary.tsv}`，译例存 `data/processed/tm_kalacakra_*`。共享词典与术语库，但笔记/译例/新术语独立。
+
+用法：`python3 agent/translator.py --project kalacakra --file 待译.txt --out 译文.md`
+（回流时 align.py 输出到 `data/processed/tm_kalacakra_*.jsonl`，校订本/平行文放 `projects/kalacakra/review/`，
+时轮专用术语加到 `projects/kalacakra/glossary.tsv`。注册表见 `agent/tools.py` 的 `PROJECTS`。）
+
 **校正会分四类归档，各有各的"家"，放对才会扩散到后续翻译：**
 
 | 校正类型 | 归档处 | 触发方式 |

@@ -33,8 +33,8 @@ PARTICLE_SYLS = {
 }
 
 PROMPT_FILE = ROOT / "agent/prompts/translate.md"
-# 笔记层（恒常注入）：法义纲要在前（先立框架），句法通则次之，文风通则在后
-NOTES_FILES = [ROOT / "notes/法义.md", ROOT / "notes/句法.md", ROOT / "notes/文风.md"]
+# 笔记层（恒常注入）：法义纲要在前（先立框架），句法通则次之，文风通则在后。
+# 具体文件按当前项目取（tools.project_notes()）；默认项目 gzhanstong 即 notes/ 三件。
 POLISH_FILE = ROOT / "agent/prompts/polish.md"
 
 
@@ -107,8 +107,8 @@ def build_packet(text: str) -> str:
     segs = split_segments(text)
     lines = []
     lines.append(PROMPT_FILE.read_text(encoding="utf-8"))
-    # 笔记层：法义纲要 + 句法通则（恒常注入，先于原文，供全篇遵循）
-    for nf in NOTES_FILES:
+    # 笔记层：法义纲要 + 句法通则（恒常注入，先于原文，供全篇遵循）——按当前项目取
+    for nf in tools.project_notes():
         if nf.exists():
             lines.append("\n---\n" + nf.read_text(encoding="utf-8"))
     lines.append("\n---\n## 待译原文（共 %d 段）\n" % len(segs))
@@ -228,8 +228,9 @@ def _bo_line_count(text: str) -> int:
 def build_polish_packet(draft: str, src_text: str) -> str:
     """第二遍润色资料包：润色规范 + 文风笔记 + 术语约束（守住不改）+ 直译稿。"""
     lines = [POLISH_FILE.read_text(encoding="utf-8")]
-    wind = ROOT / "notes/文风.md"
-    if wind.exists():
+    # 文风笔记按当前项目取（约定为笔记层最后一件 …/文风.md）
+    wind = next((n for n in tools.project_notes() if n.name == "文风.md"), None)
+    if wind and wind.exists():
         lines.append("\n---\n" + wind.read_text(encoding="utf-8"))
     # 术语约束：让润色明确哪些译名必须保持不动
     glo = tools.scan_glossary(src_text)
@@ -253,7 +254,12 @@ def main():
                     help="翻译后再跑一遍『文风润色』（默认开；--no-polish 关）。两阶段：准确直译→定稿体润色")
     ap.add_argument("--out", type=Path)
     ap.add_argument("--model", default="")
+    ap.add_argument("--project", default="gzhanstong",
+                    help="翻译项目：gzhanstong(胜乘中观·默认) / kalacakra(时轮根本续)。"
+                         "决定注入哪套笔记/译例/术语覆盖层；两本词典与共享术语库始终共用")
     args = ap.parse_args()
+
+    tools.set_project(args.project)   # 切项目：选定 notes/tm/术语覆盖层（默认不改变原行为）
 
     text = args.text or (args.file.read_text(encoding="utf-8") if args.file else None)
     if not text:
