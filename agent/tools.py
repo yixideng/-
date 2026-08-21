@@ -42,6 +42,7 @@ _GZHANSTONG_TM = [
     ROOT / "data/processed/tm_gzhanstong_34.jsonl",        # 同上（品三 界之一切相义·离戏相·不相杂相·三喻四根颂）
     ROOT / "data/processed/tm_gzhanstong_35.jsonl",        # 同上（品三 双运相·种姓与界·龙树会通·九相总摄·五根颂）
     ROOT / "data/processed/tm_gzhanstong_36.jsonl",        # 同上（品三 九相断疑·常义/周遍义/自证义·三根颂）
+    ROOT / "data/processed/tm_gzhanstong_37.jsonl",        # 同上（品三 破立归属·缘起断疑·双运义·种界现相·凡圣见·多根颂）
     ROOT / "data/processed/tm_zhongguan.jsonl",
     ROOT / "data/processed/tm_baoxinglun.jsonl",
 ]
