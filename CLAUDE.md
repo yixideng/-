@@ -97,6 +97,7 @@ python3 pipeline/align.py review/gzhanstong_3.6_断疑常义周遍自证_paralle
 python3 pipeline/align.py review/gzhanstong_3.7_破立缘起双运种界现相_parallel.txt --source "他空中观品三破立缘起双运种界现相校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_37.jsonl
 python3 pipeline/align.py review/gzhanstong_3.8_法界离时种界遍义破三错解_parallel.txt --source "他空中观品三法界离时种界遍义破三错解校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_38.jsonl
 python3 pipeline/align.py review/gzhanstong_3.9_阿赖耶智涅槃轮回基果非新生_parallel.txt --source "他空中观品三阿赖耶智涅槃轮回基果非新生校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_39.jsonl
+python3 pipeline/align.py review/gzhanstong_4.1_真世俗唯识八识聚三十颂略标_parallel.txt --source "他空中观品四真世俗唯识八识聚三十颂略标校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_41.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
