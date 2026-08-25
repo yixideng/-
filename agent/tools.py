@@ -46,6 +46,7 @@ _GZHANSTONG_TM = [
     ROOT / "data/processed/tm_gzhanstong_38.jsonl",        # 同上（品三 法界离时非相续·种界khams/rigs遍义·佛遍非支分·日云障喻·破三错解如来藏·六根颂）
     ROOT / "data/processed/tm_gzhanstong_39.jsonl",        # 同上（品三终 二谛判属·遍基智/阿赖耶智·涅槃基与轮回基·种性觉未觉·果非新生·谤敬果报·多根颂）
     ROOT / "data/processed/tm_gzhanstong_41.jsonl",        # 同上（品四开篇 真世俗唯识·八识聚·世亲三十颂略标·二我增益·三能变·根颂）
+    ROOT / "data/processed/tm_gzhanstong_42.jsonl",        # 同上（品四 三识体性·异熟分/种子分·阿赖耶三相·恒河浪喻·七识如波·六根颂）
     ROOT / "data/processed/tm_zhongguan.jsonl",
     ROOT / "data/processed/tm_baoxinglun.jsonl",
 ]
