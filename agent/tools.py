@@ -50,6 +50,7 @@ _GZHANSTONG_TM = [
     ROOT / "data/processed/tm_gzhanstong_43.jsonl",        # 同上（品四 教证安立·心意识三名训诂·取识住识三分·五遍行·无覆无记·如河·转依大圆镜智）
     ROOT / "data/processed/tm_gzhanstong_44.jsonl",        # 同上（品四 释末那·六转识·八识俱起如波·意识界限五位·多根颂）
     ROOT / "data/processed/tm_gzhanstong_45.jsonl",        # 同上（品四 因果次第·二取·教理成立阿赖耶·引阿毗达磨经/解深密经·阿陀那识）
+    ROOT / "data/processed/tm_gzhanstong_46.jsonl",        # 同上（品四 理证成立阿赖耶·衣罩喻[如来藏借名指阿赖耶识]·二取还灭·唯识无外境·心性本净白布喻·引密严经月星乳酪喻·犊子部意识粗依）
     ROOT / "data/processed/tm_zhongguan.jsonl",
     ROOT / "data/processed/tm_baoxinglun.jsonl",
 ]
