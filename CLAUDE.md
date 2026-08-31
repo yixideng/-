@@ -100,6 +100,8 @@ python3 pipeline/align.py review/gzhanstong_3.9_阿赖耶智涅槃轮回基果�
 python3 pipeline/align.py review/gzhanstong_4.1_真世俗唯识八识聚三十颂略标_parallel.txt --source "他空中观品四真世俗唯识八识聚三十颂略标校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_41.jsonl
 python3 pipeline/align.py review/gzhanstong_4.2_三识体性异熟种子阿赖耶三相_parallel.txt --source "他空中观品四三识体性异熟种子阿赖耶三相校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_42.jsonl
 python3 pipeline/align.py review/gzhanstong_4.3_心意识三名五遍行无覆无记转依_parallel.txt --source "他空中观品四心意识三名五遍行无覆无记转依校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_43.jsonl
+python3 pipeline/align.py review/gzhanstong_4.4_释末那六转识八识俱起意识界限_parallel.txt --source "他空中观品四释末那六转识八识俱起意识界限校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_44.jsonl
+python3 pipeline/align.py review/gzhanstong_4.5_因果次第教理成立阿赖耶引经_parallel.txt --source "他空中观品四因果次第教理成立阿赖耶引经校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_45.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
