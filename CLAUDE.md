@@ -103,6 +103,7 @@ python3 pipeline/align.py review/gzhanstong_4.3_心意识三名五遍行无覆�
 python3 pipeline/align.py review/gzhanstong_4.4_释末那六转识八识俱起意识界限_parallel.txt --source "他空中观品四释末那六转识八识俱起意识界限校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_44.jsonl
 python3 pipeline/align.py review/gzhanstong_4.5_因果次第教理成立阿赖耶引经_parallel.txt --source "他空中观品四因果次第教理成立阿赖耶引经校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_45.jsonl
 python3 pipeline/align.py review/gzhanstong_4.6_理证成立阿赖耶衣罩喻还灭心性清净引密严经_parallel.txt --source "他空中观品四理证成立阿赖耶衣罩喻还灭心性清净引密严经校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_46.jsonl
+python3 pipeline/align.py review/gzhanstong_4.7_外境不成乳酪功德喻十八部异名龙树菩提心释成立阿赖耶_parallel.txt --source "他空中观品四外境不成乳酪功德喻十八部异名龙树菩提心释成立阿赖耶校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_47.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
