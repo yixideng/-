@@ -53,6 +53,7 @@ _GZHANSTONG_TM = [
     ROOT / "data/processed/tm_gzhanstong_46.jsonl",        # 同上（品四 理证成立阿赖耶·衣罩喻[如来藏借名指阿赖耶识]·二取还灭·唯识无外境·心性本净白布喻·引密严经月星乳酪喻·犊子部意识粗依）
     ROOT / "data/processed/tm_gzhanstong_47.jsonl",        # 同上（品四 外境不成破经部授相·乳酪种芽功德喻[果为因之功德=同一相续转变]·十八部阿赖耶异名[大众部根本识/化地部穷生死蕴/正量红衣异熟识/上座部有分识bhavāṅga]·龙树菩提心释成立阿赖耶）
     ROOT / "data/processed/tm_gzhanstong_48.jsonl",        # 同上（品四 理证成立阿赖耶·9根颂+疏·异生烦恼种依→阿罗汉相违·种依唯阿赖耶·入胎羯罗蓝位识非意识·四无心位[闷绝/灭尽定/无想定/熟睡]有心·破命根说[命根=假立有]·灭尽定近取因·破四大灭心同顺世派）
+    ROOT / "data/processed/tm_gzhanstong_49.jsonl",        # 同上（品四 理证收尾·5根颂+疏·染净因果皆依阿赖耶[造业习气·初禅同类因·母子慈心生梵天喻·世出世间道种子成熟]·破外道[阿赖耶≠数论主/自在/大梵,仅方向相似依阿赖耶假立·唯心·引楞伽经]·破一切种顿现[月称入中论前宗·一切种=同类具足·瓶种喻·缘次第现]）
     ROOT / "data/processed/tm_zhongguan.jsonl",
     ROOT / "data/processed/tm_baoxinglun.jsonl",
 ]
