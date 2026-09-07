@@ -126,6 +126,13 @@ python3 agent/translator.py --file 待译.txt --out 译文.md --no-polish   # �
 # 选模型：--model claude-opus-4-8（主力，性价比高）或 --model claude-fable-5（难点/终校）
 ```
 
+## 交付约定（与审定译者）
+
+- 向审定译者**只交付定稿稿**（`译文.md`）；**纯直译稿**（`*_直译.md`）**仅内部留存**，
+  供日后 diff「机器稿 ↔ 用户校正版」提炼文风，**不必发送**。
+- 文风分寸：**准确↔通顺** 的天平**偏向更通顺**（见 `notes/文风.md §0 总纲`）；
+  每次回流校正版后，diff「机器定稿↔校正版」把通顺方面的调整回流进 `notes/文风.md`，持续校准。
+
 ## 如何证明「用了本 agent」而非凭空翻译
 
 调用 agent 一定会执行 `python3 agent/translator.py`，且资料包里含
