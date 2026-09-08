@@ -107,6 +107,7 @@ python3 pipeline/align.py review/gzhanstong_4.7_外境不成乳酪功德喻十�
 python3 pipeline/align.py review/gzhanstong_4.8_理证成立阿赖耶四无心位有心破命根说_parallel.txt --source "他空中观品四理证成立阿赖耶四无心位有心破命根说校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_48.jsonl
 python3 pipeline/align.py review/gzhanstong_4.9_染净因果依阿赖耶破外道破一切种顿现_parallel.txt --source "他空中观品四染净因果依阿赖耶破外道破一切种顿现校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_49.jsonl
 python3 pipeline/align.py review/gzhanstong_4.10_习气新旧安置因果俱时破法称成立染污意理证_parallel.txt --source "他空中观品四习气新旧安置因果俱时破法称成立染污意理证校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_410.jsonl
+python3 pipeline/align.py review/gzhanstong_4.11_染污意教证成立八识习气异名六种子等流异熟_parallel.txt --source "他空中观品四染污意教证成立八识习气异名六种子等流异熟校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_411.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
