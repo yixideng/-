@@ -57,6 +57,7 @@ _GZHANSTONG_TM = [
     ROOT / "data/processed/tm_gzhanstong_410.jsonl",       # 同上（品四 习气新旧安置·新旧俱滋养·因果俱时[能依所依因果]破法称异时诘难·分两种因果·成立染污意理证三式[有漏善/二定别/我执相续]）
     ROOT / "data/processed/tm_gzhanstong_411.jsonl",       # 同上（品四 染污意教证[杂阿含]·无著不共无明[声闻误置意识/本论置末那]·八识成立·习气异名[习气/能/粗重]·六种子·四习气[名言/身见/业/二取]·等流异熟）
     ROOT / "data/processed/tm_gzhanstong_412.jsonl",       # 同上（品四 阿赖耶异名门·轮回粗细二转依[性相/体性]·天授祠授遍喻·六义[因果作业相应所缘趣入]·四缘七识增上缘·破「前刹那识必为等无间缘」青花刹那相续）
+    ROOT / "data/processed/tm_gzhanstong_413.jsonl",       # 同上（品四 非真实遍计[辨中边论·寻伺判摄]·识—心所分工·七识近受用/遍受用·受想行三心所·轮回生灭[大乘庄严经论·自之界]·无明独标·离二实一识现二相）
     ROOT / "data/processed/tm_zhongguan.jsonl",
     ROOT / "data/processed/tm_baoxinglun.jsonl",
 ]
