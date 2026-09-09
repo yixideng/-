@@ -56,6 +56,7 @@ _GZHANSTONG_TM = [
     ROOT / "data/processed/tm_gzhanstong_49.jsonl",        # 同上（品四 理证收尾·5根颂+疏·染净因果皆依阿赖耶[造业习气·初禅同类因·母子慈心生梵天喻·世出世间道种子成熟]·破外道[阿赖耶≠数论主/自在/大梵,仅方向相似依阿赖耶假立·唯心·引楞伽经]·破一切种顿现[月称入中论前宗·一切种=同类具足·瓶种喻·缘次第现]）
     ROOT / "data/processed/tm_gzhanstong_410.jsonl",       # 同上（品四 习气新旧安置·新旧俱滋养·因果俱时[能依所依因果]破法称异时诘难·分两种因果·成立染污意理证三式[有漏善/二定别/我执相续]）
     ROOT / "data/processed/tm_gzhanstong_411.jsonl",       # 同上（品四 染污意教证[杂阿含]·无著不共无明[声闻误置意识/本论置末那]·八识成立·习气异名[习气/能/粗重]·六种子·四习气[名言/身见/业/二取]·等流异熟）
+    ROOT / "data/processed/tm_gzhanstong_412.jsonl",       # 同上（品四 阿赖耶异名门·轮回粗细二转依[性相/体性]·天授祠授遍喻·六义[因果作业相应所缘趣入]·四缘七识增上缘·破「前刹那识必为等无间缘」青花刹那相续）
     ROOT / "data/processed/tm_zhongguan.jsonl",
     ROOT / "data/processed/tm_baoxinglun.jsonl",
 ]
