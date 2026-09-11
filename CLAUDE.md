@@ -110,6 +110,7 @@ python3 pipeline/align.py review/gzhanstong_4.10_习气新旧安置因果俱时�
 python3 pipeline/align.py review/gzhanstong_4.11_染污意教证成立八识习气异名六种子等流异熟_parallel.txt --source "他空中观品四染污意教证成立八识习气异名六种子等流异熟校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_411.jsonl
 python3 pipeline/align.py review/gzhanstong_4.12_阿赖耶异名门轮回转依因果作业六缘破一识_parallel.txt --source "他空中观品四阿赖耶异名门轮回转依因果作业六缘破一识校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_412.jsonl
 python3 pipeline/align.py review/gzhanstong_4.13_非真实遍计识心所分工七识受用受想行轮回生灭唯识无境_parallel.txt --source "他空中观品四非真实遍计识心所分工七识受用受想行轮回生灭唯识无境校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_413.jsonl
+python3 pipeline/align.py review/gzhanstong_4.14_轮回还灭止观四所缘如理作意道破二取_parallel.txt --source "他空中观品四轮回还灭止观四所缘如理作意道破二取校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_414.jsonl
 python3 pipeline/align.py review/gzhanstong_4.15_义摄结颂八识成立品竟_parallel.txt --source "他空中观品四义摄结颂八识成立品竟校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_415.jsonl
 ```
 
