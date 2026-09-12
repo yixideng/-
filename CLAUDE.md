@@ -112,6 +112,7 @@ python3 pipeline/align.py review/gzhanstong_4.12_阿赖耶异名门轮回转依�
 python3 pipeline/align.py review/gzhanstong_4.13_非真实遍计识心所分工七识受用受想行轮回生灭唯识无境_parallel.txt --source "他空中观品四非真实遍计识心所分工七识受用受想行轮回生灭唯识无境校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_413.jsonl
 python3 pipeline/align.py review/gzhanstong_4.14_轮回还灭止观四所缘如理作意道破二取_parallel.txt --source "他空中观品四轮回还灭止观四所缘如理作意道破二取校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_414.jsonl
 python3 pipeline/align.py review/gzhanstong_4.15_义摄结颂八识成立品竟_parallel.txt --source "他空中观品四义摄结颂八识成立品竟校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_415.jsonl
+python3 pipeline/align.py review/gzhanstong_5.1_五法体性因相分类_parallel.txt --source "他空中观品五五法体性因相分类校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_51.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
