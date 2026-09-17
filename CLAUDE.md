@@ -118,6 +118,8 @@ python3 pipeline/align.py review/gzhanstong_5.3_三性略示广说体性圆成�
 python3 pipeline/align.py review/gzhanstong_5.4_圆成后二相三性摄三无自性龙树世亲教证遍计分类_parallel.txt --source "他空中观品五三性圆成后二相·三性摄·三无自性·龙树世亲教证·遍计分类校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_54.jsonl
 python3 pipeline/align.py review/gzhanstong_5.5_依他分类楞伽六依他圆成分类无著四种弥勒二种_parallel.txt --source "他空中观品五依他分类·楞伽六依他·圆成分类无著四种弥勒二种校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_55.jsonl
 python3 pipeline/align.py review/gzhanstong_5.6_三性一异抉择摄二依他遍计所依破净依他独存圆成二种_parallel.txt --source "他空中观品五三性一异抉择·摄二·破净依他独存·圆成二种校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_56.jsonl
+python3 pipeline/align.py review/gzhanstong_5.7_引申义十种散乱分别_parallel.txt --source "他空中观品五5.7引申义十种散乱分别校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_57.jsonl
+python3 pipeline/align.py review/gzhanstong_5.8_根本分别十种分别遍计无边_parallel.txt --source "他空中观品五5.8根本分别十种分别遍计无边校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_58.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
