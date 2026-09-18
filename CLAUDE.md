@@ -120,6 +120,7 @@ python3 pipeline/align.py review/gzhanstong_5.5_依他分类楞伽六依他圆�
 python3 pipeline/align.py review/gzhanstong_5.6_三性一异抉择摄二依他遍计所依破净依他独存圆成二种_parallel.txt --source "他空中观品五三性一异抉择·摄二·破净依他独存·圆成二种校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_56.jsonl
 python3 pipeline/align.py review/gzhanstong_5.7_引申义十种散乱分别_parallel.txt --source "他空中观品五5.7引申义十种散乱分别校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_57.jsonl
 python3 pipeline/align.py review/gzhanstong_5.8_根本分别十种分别十一识唯识无外境_parallel.txt --source "他空中观品五5.8根本分别十种分别十一识唯识无外境校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_58.jsonl
+python3 pipeline/align.py review/gzhanstong_5.9_三性有无水月喻遍所相事烦恼道果三空性_parallel.txt --source "他空中观品五5.9三性有无水月喻遍所相事烦恼道果三空性校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_59.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
