@@ -123,6 +123,7 @@ python3 pipeline/align.py review/gzhanstong_5.8_根本分别十种分别十一�
 python3 pipeline/align.py review/gzhanstong_5.9_三性有无水月喻遍所相事烦恼道果三空性_parallel.txt --source "他空中观品五5.9三性有无水月喻遍所相事烦恼道果三空性校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_59.jsonl
 python3 pipeline/align.py review/gzhanstong_5.10_三空性般若五百颂经说有无密意三无自性引申缘起二分_parallel.txt --source "他空中观品五5.10三空性般若五百颂经说有无密意三无自性引申缘起二分校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_510.jsonl
 python3 pipeline/align.py review/gzhanstong_5.11_真实缘起阿赖耶缘起词义训诂缘起三分分别自性爱非爱_parallel.txt --source "他空中观品五5.11真实缘起阿赖耶缘起词义训诂缘起三分分别自性爱非爱校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_511.jsonl
+python3 pipeline/align.py review/gzhanstong_5.12_爱非爱缘起字义染净受用缘起触受四缘细无常声闻人无我阿罗汉转依缘起八分外内器世间_parallel.txt --source "他空中观品五5.12爱非爱缘起字义染净受用缘起触受四缘细无常声闻人无我阿罗汉转依缘起八分外内器世间校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_512.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
