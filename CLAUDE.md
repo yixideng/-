@@ -125,6 +125,7 @@ python3 pipeline/align.py review/gzhanstong_5.10_三空性般若五百颂经说�
 python3 pipeline/align.py review/gzhanstong_5.11_真实缘起阿赖耶缘起词义训诂缘起三分分别自性爱非爱_parallel.txt --source "他空中观品五5.11真实缘起阿赖耶缘起词义训诂缘起三分分别自性爱非爱校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_511.jsonl
 python3 pipeline/align.py review/gzhanstong_5.12_爱非爱缘起字义染净受用缘起触受四缘细无常声闻人无我阿罗汉转依缘起八分外内器世间_parallel.txt --source "他空中观品五5.12爱非爱缘起字义染净受用缘起触受四缘细无常声闻人无我阿罗汉转依缘起八分外内器世间校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_512.jsonl
 python3 pipeline/align.py review/gzhanstong_5.13a_四食养命可欲不可欲趣清净五道威力六神通八分总摄六染二净十二支四门分位二生三生摄颂_parallel.txt --source "他空中观品五5.13a四食养命可欲不可欲趣清净五道威力六神通八分总摄六染二净十二支四门分位二生三生摄颂校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_513a.jsonl
+python3 pipeline/align.py review/gzhanstong_5.13b_分位缘起长行二生三生引成四支惑业苦植种养种印藏混杂说辩破所引支种子位应成破_parallel.txt --source "他空中观品五5.13b分位缘起长行二生三生引成四支惑业苦植种养种印藏混杂说辩破所引支种子位应成破校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_513b.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
