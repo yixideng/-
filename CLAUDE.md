@@ -127,6 +127,7 @@ python3 pipeline/align.py review/gzhanstong_5.12_爱非爱缘起字义染净受�
 python3 pipeline/align.py review/gzhanstong_5.13a_四食养命可欲不可欲趣清净五道威力六神通八分总摄六染二净十二支四门分位二生三生摄颂_parallel.txt --source "他空中观品五5.13a四食养命可欲不可欲趣清净五道威力六神通八分总摄六染二净十二支四门分位二生三生摄颂校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_513a.jsonl
 python3 pipeline/align.py review/gzhanstong_5.13b_分位缘起长行二生三生引成四支惑业苦植种养种印藏混杂说辩破所引支种子位应成破_parallel.txt --source "他空中观品五5.13b分位缘起长行二生三生引成四支惑业苦植种养种印藏混杂说辩破所引支种子位应成破校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_513b.jsonl
 python3 pipeline/align.py review/gzhanstong_5.14_辩破一业二异熟三世二次因果遮三际愚一生圆满十二支刹那相属缘起_parallel.txt --source "他空中观品五5.14辩破一业二异熟三世二次因果遮三际愚一生圆满十二支刹那相属缘起校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_514.jsonl
+python3 pipeline/align.py review/gzhanstong_5.15_辨中边论十二支性相颂无明支三特征词源明觉具烦恼无明根本我痴辩破萨迦耶见行支福非福不动业_parallel.txt --source "他空中观品五5.15辨中边论十二支性相颂无明支三特征词源明觉具烦恼无明根本我痴辩破萨迦耶见行支福非福不动业校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_515.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
