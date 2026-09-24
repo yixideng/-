@@ -128,6 +128,8 @@ python3 pipeline/align.py review/gzhanstong_5.13a_四食养命可欲不可欲趣
 python3 pipeline/align.py review/gzhanstong_5.13b_分位缘起长行二生三生引成四支惑业苦植种养种印藏混杂说辩破所引支种子位应成破_parallel.txt --source "他空中观品五5.13b分位缘起长行二生三生引成四支惑业苦植种养种印藏混杂说辩破所引支种子位应成破校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_513b.jsonl
 python3 pipeline/align.py review/gzhanstong_5.14_辩破一业二异熟三世二次因果遮三际愚一生圆满十二支刹那相属缘起_parallel.txt --source "他空中观品五5.14辩破一业二异熟三世二次因果遮三际愚一生圆满十二支刹那相属缘起校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_514.jsonl
 python3 pipeline/align.py review/gzhanstong_5.15_辨中边论十二支性相颂无明支三特征词源明觉具烦恼无明根本我痴辩破萨迦耶见行支福非福不动业_parallel.txt --source "他空中观品五5.15辨中边论十二支性相颂无明支三特征词源明觉具烦恼无明根本我痴辩破萨迦耶见行支福非福不动业校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_515.jsonl
+python3 pipeline/align.py review/gzhanstong_5.16_识支因果位名色四名蕴胎中五位六处触受十八意近行三爱四取有生老死_parallel.txt --source "他空中观品五5.16识支因果位名色四名蕴胎中五位六处触受十八意近行三爱四取有生老死校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_516.jsonl
+python3 pipeline/align.py review/gzhanstong_5.17_文义辨中边论十一门正智随顺行支识支因果二识摄十一支名色支同分身_parallel.txt --source "他空中观品五5.17文义辨中边论十一门正智随顺行支识支因果二识摄十一支名色支同分身校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_517.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
