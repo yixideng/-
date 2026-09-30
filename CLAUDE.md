@@ -132,6 +132,7 @@ python3 pipeline/align.py review/gzhanstong_5.16_识支因果位名色四名蕴�
 python3 pipeline/align.py review/gzhanstong_5.17_文义辨中边论十一门正智随顺行支识支因果二识摄十一支名色支同分身_parallel.txt --source "他空中观品五5.17文义辨中边论十一门正智随顺行支识支因果二识摄十一支名色支同分身校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_517.jsonl
 python3 pipeline/align.py review/gzhanstong_5.18_辨中边论十一门余支六处至老死世亲三生具例第二科摄三杂染二摄俱舍龙树颂_parallel.txt --source "他空中观品五5.18辨中边论十一门余支六处至老死世亲三生具例第二科摄三杂染二摄俱舍龙树颂校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_518.jsonl
 python3 pipeline/align.py review/gzhanstong_5.19_二摄因果杂染第三义项七杂染因辨中边论七因二生圆满安慧寿种子能引能成缘起具例_parallel.txt --source "他空中观品五5.19二摄因果杂染第三义项七杂染因辨中边论七因二生圆满安慧寿种子能引能成缘起具例校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_519.jsonl
+python3 pipeline/align.py review/gzhanstong_5.20_释世亲缘起经释三根颂能引缘起三分能成缘起三分七义配支老死过患安慧根颂受生爱取生新业真谛现见不积引业_parallel.txt --source "他空中观品五5.20释世亲缘起经释三根颂能引缘起三分能成缘起三分七义配支老死过患安慧根颂受生爱取生新业真谛现见不积引业校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_520.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
