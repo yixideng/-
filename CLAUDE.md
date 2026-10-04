@@ -136,6 +136,7 @@ python3 pipeline/align.py review/gzhanstong_5.20_释世亲缘起经释三根颂�
 python3 pipeline/align.py review/gzhanstong_5.21_见谛界限断三结破世间道得不还离爱无生阿罗汉断三界爱缘起义摄三相缘起真实性无我真实刹那无常苦空无我破作者_parallel.txt --source "他空中观品五5.21见谛界限断三结破世间道得不还离爱无生阿罗汉断三界爱缘起义摄三相缘起真实性无我真实刹那无常苦空无我破作者校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_521.jsonl
 python3 pipeline/align.py review/gzhanstong_5.22_缘起真实性内真实五义项非造作忽尔破外境谛实内识现外境相业烦恼苦唯内识生破微尘聚粗物天眼梦喻破眼识四缘外境_parallel.txt --source "他空中观品五5.22缘起真实性内真实五义项非造作忽尔破外境谛实内识现外境相业烦恼苦唯内识生破微尘聚粗物天眼梦喻破眼识四缘外境校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_522.jsonl
 python3 pipeline/align.py review/gzhanstong_5.23_内真实第五科假立唯识总时唯心生住灭一识现三世无自性真实唯识如梦不灭所取无能取无离四边唯识无自性四重世俗谛位_parallel.txt --source "他空中观品五5.23内真实第五科假立唯识总时唯心生住灭一识现三世无自性真实唯识如梦不灭所取无能取无离四边唯识无自性四重世俗谛位校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_523.jsonl
+python3 pipeline/align.py review/gzhanstong_5.24_集论缘起甚深四不生破无著龙树缘起差别说胜义缘起自性光明本智离能生所立二缘起布达拉忆念喻缘起即空性人法二无我趣入名义经十二支根本颂_parallel.txt --source "他空中观品五5.24集论缘起甚深四不生破无著龙树缘起差别说胜义缘起自性光明本智离能生所立二缘起布达拉忆念喻缘起即空性人法二无我趣入名义经十二支根本颂校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_524.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
