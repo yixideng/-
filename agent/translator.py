@@ -251,10 +251,13 @@ def _split_tail(text: str):
 
 
 def _norm_bo(block: str) -> str:
-    """取对照组内首个藏文行、去所有空白，作段级对齐的 key。"""
+    """取对照组内首个藏文行、提取『藏文字母骨架』作段级对齐 key。
+    只留辅音/下加字/元音记号（U+0F40–U+0FBC），滤去 tsek（U+0F0B 与变体
+    U+0F0C）、shad、标点、空白、数字——使同一句不因润色遍『照抄』时隐性
+    规范化这些符号而匹配失败（曾致 5.28 全 17 段回退、语法适配落空）。"""
     for ln in block.splitlines():
         if any(0x0F00 <= ord(c) <= 0x0FFF for c in ln):
-            return re.sub(r"\s", "", ln)
+            return "".join(c for c in ln if 0x0F40 <= ord(c) <= 0x0FBC)
     return ""
 
 
