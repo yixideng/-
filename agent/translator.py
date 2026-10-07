@@ -225,6 +225,66 @@ def _bo_line_count(text: str) -> int:
     return n
 
 
+def _clean_draft(text: str) -> str:
+    """剥除模型偶发的稿首噪声（英文自语/前言），使对照从首个『纯藏文行』起。
+    正文藏文原文行不含拉丁字母（梵文转写只落在汉译行），据此锚定正文起点，
+    杜绝『半句藏文＋英文碎语』之类噪声行虚增段数、误触兜底。"""
+    lines = (text or "").splitlines()
+    start = 0
+    for i, ln in enumerate(lines):
+        has_bo = any(0x0F00 <= ord(c) <= 0x0FFF for c in ln)
+        has_latin = any("a" <= c.lower() <= "z" for c in ln)
+        if has_bo and not has_latin:
+            start = i
+            break
+    return "\n".join(lines[start:]).strip()
+
+
+def _split_tail(text: str):
+    """切出正文与文末『校勘/校订/译注/按语』节（后者原样保留、不参与段级对齐）。"""
+    lines = text.splitlines()
+    for i, ln in enumerate(lines):
+        s = ln.lstrip("#＃ 　").strip()
+        if s.startswith(("校勘", "校订", "译注", "按语")):
+            return "\n".join(lines[:i]).strip(), "\n".join(lines[i:]).strip()
+    return text.strip(), ""
+
+
+def _norm_bo(block: str) -> str:
+    """取对照组内首个藏文行、去所有空白，作段级对齐的 key。"""
+    for ln in block.splitlines():
+        if any(0x0F00 <= ord(c) <= 0x0FFF for c in ln):
+            return re.sub(r"\s", "", ln)
+    return ""
+
+
+def _merge_polished(draft: str, polished: str):
+    """段级对齐兜底：以直译稿段序为准，逐段取润色稿中『藏文行相同』之段之汉译；
+    润色稿缺失/改动藏文行而对不上的个别段，回退该段直译。段数恒等于直译稿，
+    免得一处漂移就整篇弃用润色。返回 (合并稿, 回退段数)。"""
+    d_body, tail = _split_tail(draft)
+    p_body, _ = _split_tail(polished)
+    d_blocks = [b for b in re.split(r"\n\s*\n", d_body.strip()) if b.strip()]
+    p_blocks = [b for b in re.split(r"\n\s*\n", p_body.strip()) if b.strip()]
+    p_map = {}
+    for b in p_blocks:
+        k = _norm_bo(b)
+        if k and k not in p_map:
+            p_map[k] = b
+    merged, fallback = [], 0
+    for b in d_blocks:
+        hit = p_map.get(_norm_bo(b))
+        if hit:
+            merged.append(hit)
+        else:
+            merged.append(b)
+            fallback += 1
+    out = "\n\n".join(merged)
+    if tail:
+        out += "\n\n" + tail
+    return out, fallback
+
+
 def build_polish_packet(draft: str, src_text: str) -> str:
     """第二遍润色资料包：润色规范 + 文风笔记 + 术语约束（守住不改）+ 直译稿。"""
     lines = [POLISH_FILE.read_text(encoding="utf-8")]
@@ -273,24 +333,24 @@ def main():
     guard1 = ("你是藏译汉『译经引擎』。下方用户消息已含全部所需资料"
               "（系统指令·法义/句法/文风笔记·术语约束·词典释义·参考译例·待译原文）。"
               "唯一任务：按系统指令逐段输出藏汉逐段对照译文。"
+              "第一行必须就是第一段藏文原文，严禁任何前言、自语、英文或说明；"
               "严禁调用任何工具、运行脚本或本仓库流水线，严禁询问权限或反问，直接输出译文。")
-    draft = _run_claude(packet, args.model, guard1)   # 第一遍：准确直译
+    draft = _clean_draft(_run_claude(packet, args.model, guard1))   # 第一遍：准确直译（清洗稿首噪声）
     out = draft
 
     if args.polish:
+        # 第二遍『语法适配』：汉语语序/成分位置/虚词/断句的通顺化 + 文风定稿，不动义理/术语/对照。
         guard2 = ("你是藏译汉定稿润色师。下方已含直译稿·文风笔记·术语约束。"
                   "唯一任务：只改汉译行文、不动义理/术语/格式（藏文行照抄），输出润色后的对照全文。"
                   "严禁调用任何工具或反问，直接输出。")
-        polished = _run_claude(build_polish_packet(draft, text), args.model, guard2)
-        # 段数校验兜底：润色遍若擅自合并/拆分段落（藏文行数变化），弃用润色、保留直译，避免对照错位。
-        n_draft, n_pol = _bo_line_count(draft), _bo_line_count(polished)
+        polished = _clean_draft(_run_claude(build_polish_packet(draft, text), args.model, guard2))
+        # 段级对齐兜底：段数恒守恒（=直译段数），通顺化尽量采纳；润色对不上的个别段回退该段直译。
         if not polished:
-            print("（润色遍无输出，保留直译稿）", file=sys.stderr)
-        elif n_pol != n_draft:
-            print(f"（润色遍段数漂移：直译 {n_draft} 段→润色 {n_pol} 段，已弃用润色、保留直译稿）",
-                  file=sys.stderr)
+            print("（语法适配遍无输出，保留直译稿）", file=sys.stderr)
         else:
-            out = polished
+            out, fb = _merge_polished(draft, polished)
+            tag = "全段采纳" if fb == 0 else f"{fb} 段对不上·已回退该段直译"
+            print(f"（语法适配遍：{_bo_line_count(draft)} 段·{tag}）", file=sys.stderr)
 
     if args.out:
         args.out.write_text(out + "\n", encoding="utf-8")
