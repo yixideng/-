@@ -139,6 +139,7 @@ python3 pipeline/align.py review/gzhanstong_5.23_内真实第五科假立唯识�
 python3 pipeline/align.py review/gzhanstong_5.24_集论缘起甚深四不生破无著龙树缘起差别说胜义缘起自性光明本智离能生所立二缘起布达拉忆念喻缘起即空性人法二无我趣入名义经十二支根本颂_parallel.txt --source "他空中观品五5.24集论缘起甚深四不生破无著龙树缘起差别说胜义缘起自性光明本智离能生所立二缘起布达拉忆念喻缘起即空性人法二无我趣入名义经十二支根本颂校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_524.jsonl
 python3 pipeline/align.py review/gzhanstong_5.25_缘起引申因缘安立六因四缘五果十五种略标广说能作因俱有因同类相应遍行异熟因四缘五果异名相应因四义俱有因内外_parallel.txt --source "他空中观品五5.25缘起引申因缘安立六因四缘五果十五种略标广说能作因俱有因同类相应遍行异熟因四缘五果异名相应因四义俱有因内外校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_525.jsonl
 python3 pipeline/align.py review/gzhanstong_5.26_俱有因外四大种八九事微尘甘蔗喻遍行因烦恼生烦恼类地不定与同类因关系同类因相顺异熟因善恶生无记能作因破无力二十差别士用果_parallel.txt --source "他空中观品五5.26俱有因外四大种八九事微尘甘蔗喻遍行因烦恼生烦恼类地不定与同类因关系同类因相顺异熟因善恶生无记能作因破无力二十差别士用果校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_526.jsonl
+python3 pipeline/align.py review/gzhanstong_5.27_释四缘因缘五因摄近取因阿赖耶所缘缘增上缘四分等无间缘三说色法二缘识四缘_parallel.txt --source "他空中观品五5.27释四缘因缘五因摄近取因阿赖耶所缘缘增上缘四分等无间缘三说色法二缘识四缘校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_527.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
