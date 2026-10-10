@@ -141,6 +141,7 @@ python3 pipeline/align.py review/gzhanstong_5.25_缘起引申因缘安立六因�
 python3 pipeline/align.py review/gzhanstong_5.26_俱有因外四大种八九事微尘甘蔗喻遍行因烦恼生烦恼类地不定与同类因关系同类因相顺异熟因善恶生无记能作因破无力二十差别士用果_parallel.txt --source "他空中观品五5.26俱有因外四大种八九事微尘甘蔗喻遍行因烦恼生烦恼类地不定与同类因关系同类因相顺异熟因善恶生无记能作因破无力二十差别士用果校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_526.jsonl
 python3 pipeline/align.py review/gzhanstong_5.27_释四缘因缘五因摄近取因阿赖耶所缘缘增上缘四分等无间缘三说色法二缘识四缘_parallel.txt --source "他空中观品五5.27释四缘因缘五因摄近取因阿赖耶所缘缘增上缘四分等无间缘三说色法二缘识四缘校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_527.jsonl
 python3 pipeline/align.py review/gzhanstong_5.28_释五果离系果择灭胜义灭谛增上异熟士用等流果二因总摄无漏种子得生加行观待成立辨左右山喻只破遍计不破依他品五终_parallel.txt --source "他空中观品五5.28释五果离系果择灭胜义灭谛增上异熟士用等流果二因总摄无漏种子得生加行观待成立辨左右山喻只破遍计不破依他品五终校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_528.jsonl
+python3 pipeline/align.py review/gzhanstong_6.1_二无我品开篇人无我趣入四颠倒我执萨迦耶见染污慧无明常断二边细无常行苦_parallel.txt --source "他空中观品六6.1二无我品开篇人无我趣入四颠倒我执萨迦耶见染污慧无明常断二边细无常行苦校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_61.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
