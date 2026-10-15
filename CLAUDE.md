@@ -144,6 +144,7 @@ python3 pipeline/align.py review/gzhanstong_5.28_释五果离系果择灭胜义�
 python3 pipeline/align.py review/gzhanstong_6.1_二无我品开篇人无我趣入四颠倒我执萨迦耶见染污慧无明常断二边细无常行苦_parallel.txt --source "他空中观品六6.1二无我品开篇人无我趣入四颠倒我执萨迦耶见染污慧无明常断二边细无常行苦校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_61.jsonl
 python3 pipeline/align.py review/gzhanstong_6.2_成立人无我正理前行成立有为无常刹那生灭多重理证_parallel.txt --source "他空中观品六6.2成立有为无常刹那生灭多重理证校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_62.jsonl
 python3 pipeline/align.py review/gzhanstong_6.3_成立内之诸行刹那十四种生.txt --source "他空中观品六6.3成立内之诸行刹那十四种生校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_63.jsonl
+python3 pipeline/align.py review/gzhanstong_6.4_外器世间诸行刹那引申义无实法无常空性非胜义.txt --source "他空中观品六6.4外器世间诸行刹那引申义无实法无常空性非胜义校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_64.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
