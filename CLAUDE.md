@@ -148,6 +148,7 @@ python3 pipeline/align.py review/gzhanstong_6.4_外器世间诸行刹那引申�
 python3 pipeline/align.py "review/gzhanstong_6.5_引申义考察生灭之义二灭有为实法无实法皆有为_parallel.txt" --source "他空中观品六6.5引申义考察生灭之义二灭有为实法无实法皆有为校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_65.jsonl
 python3 pipeline/align.py "review/gzhanstong_6.6_成立诸行为苦_parallel.txt" --source "他空中观品六6.6成立诸行为苦校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_66.jsonl
 python3 pipeline/align.py "review/gzhanstong_6.7_成立诸行空于作者破自在天_parallel.txt" --source "他空中观品六6.7成立诸行空于作者破自在天校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_67.jsonl
+python3 pipeline/align.py "review/gzhanstong_6.8_人无我正说须说理由我执萨迦耶见象喻三别三性所化三类四宗立宗_parallel.txt" --source "他空中观品六6.8人无我正说须说理由我执萨迦耶见象喻三别三性所化三类四宗立宗校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_68.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
