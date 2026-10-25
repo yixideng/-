@@ -150,6 +150,7 @@ python3 pipeline/align.py "review/gzhanstong_6.6_成立诸行为苦_parallel.txt
 python3 pipeline/align.py "review/gzhanstong_6.7_成立诸行空于作者破自在天_parallel.txt" --source "他空中观品六6.7成立诸行空于作者破自在天校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_67.jsonl
 python3 pipeline/align.py "review/gzhanstong_6.8_人无我正说须说理由我执萨迦耶见象喻三别三性所化三类四宗立宗_parallel.txt" --source "他空中观品六6.8人无我正说须说理由我执萨迦耶见象喻三别三性所化三类四宗立宗校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_68.jsonl
 python3 pipeline/align.py "review/gzhanstong_6.9_弥勒庄严经论文破我与作者三择破河流喻二因不悟行苦法性破作者真实品菩提分品立宗_parallel.txt" --source "他空中观品六6.9弥勒庄严经论文破我与作者三择破河流喻二因不悟行苦法性破作者真实品菩提分品立宗校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_69.jsonl
+python3 pipeline/align.py "review/gzhanstong_6.10_破补特伽罗实体有广释五科总破我蕴一异不可说犊子部火薪喻_parallel.txt" --source "他空中观品六6.10破补特伽罗实体有广释五科总破我蕴一异不可说犊子部火薪喻校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_610.jsonl
 ```
 
 术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
