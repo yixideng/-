@@ -1,20 +1,19 @@
-"""解析 MDX 导出的「梵-中-藏」词汇表（如《宝性论大疏》词汇表）为可建库的 JSONL。
+"""解析 MDX 导出的「梵-中-藏」词汇表为可建库的 JSONL（兼容两种版式）。
 
-源格式（每条数据集中在以 <b> 起首的那一行）：
-    abhedārtha
-    <b>abhedārtha </b><br><br>【中文】无别义 <br><br>【梵文转写】abhedārtha <br><br>【藏文】དབྱེར་མེད་པའི་དོན།
-    </>
+本仓库查词以**藏文**为键，而这类词汇表以**梵文**为词头，故按【藏文】反向建索引：
+取藏文字段逐一作 headword（经 lookup_key 归一：NFC＋去两端 shad/tsek），释义＝中文。
+同一藏文形在多条中出现则合并其多个中文义、梵文转写。输出 JSONL 交 build_index.py。
 
-本词汇表以**梵文**为词头，而本仓库查词以**藏文**为键，故按【藏文】反向建索引：
-取【藏文】字段（可含多个藏文形，以空格分隔）逐一作 headword（经 lookup_key 归一：
-NFC＋去两端 shad/tsek），释义＝【中文】；同一藏文形在多条中出现则合并其多个中文义、
-梵文转写并记。输出 JSONL 交 build_index.py 压成 sqlite。
+兼容两种版式（逐行自动判别）：
+  A. 带标签（宝性论大疏词汇表）：
+     <b>abhedārtha </b><br><br>【中文】无别义 <br><br>【梵文转写】abhedārtha <br><br>【藏文】དབྱེར་མེད་པའི་དོན།
+  B. 无标签·按位置（瑜伽师地论词汇表）：
+     <b>a-bala</b><br><br> 无力<br><br> མི་ཆོག།<br><br> mi chog
+     —— <b>…</b> 内为梵文词头；其后 <br><br> 分隔的字段中，含汉字者＝中文、含藏文字符者＝藏文，
+        末段威利转写(拉丁)忽略。多个藏文形以 ; ； ༚ 或空白分隔。
 
 用法：
-    python3 pipeline/parse_mdx_glossary.py \
-        data/raw/dictionaries/ratnagotra_glossary_mdx.txt \
-        --source 宝性论大疏词汇表 \
-        --out data/processed/ratnagotra_glossary.jsonl
+    python3 pipeline/parse_mdx_glossary.py <src.txt> --source <词源名> --out <out.jsonl>
 """
 import argparse
 import json
@@ -26,46 +25,57 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from normalize import lookup_key, nfc  # noqa: E402
 
 _NOTE = "（《宝性论释》梵本中所未出现的词汇）"
-RE_CN = re.compile(r"【中文】\s*(.*?)\s*(?:<br|【|$)")
-RE_SA = re.compile(r"【梵文转写】\s*(.*?)\s*(?:<br|【|$)")
-RE_BO = re.compile(r"【藏文】\s*(.*?)\s*$")
 RE_TAG = re.compile(r"<[^>]*>")
+RE_BR = re.compile(r"<br\s*/?>", re.I)
+RE_LBL_CN = re.compile(r"【中文】\s*(.*?)\s*(?:<br|【|$)")
+RE_LBL_BO = re.compile(r"【藏文】\s*(.*?)\s*$")
+RE_BO_SPLIT = re.compile(r"[;；༚]+|\s{1,}")
 
 
-def _clean(s: str) -> str:
+def _has_bo(s):  return any(0x0F00 <= ord(c) <= 0x0FFF for c in s)
+def _has_han(s): return any(0x4E00 <= ord(c) <= 0x9FFF for c in s)
+
+
+def _clean_cn(s: str) -> str:
     s = RE_TAG.sub("", s).replace(_NOTE, "")
+    s = re.sub(r"【[^】]*】", "", s)          # 去 【中文】/【梵文转写】等标签
     return " ".join(s.split()).strip(" ，,")
 
 
-def parse(path: Path, source: str):
-    # headword(归一藏文形) -> {"raw": 原形, "cn": [中文…], "sa": [梵…]}
-    acc = {}
+def _parse_line(line: str):
+    """返回 (中文, 藏文串)；无法解析返回 (None, None)。"""
+    body = line.strip()
+    if not body.startswith("<b>"):
+        return None, None
+    body = re.sub(r"^<b>.*?</b>", "", body, count=1)   # 去梵文词头块
+    if "【中文】" in line or "【藏文】" in line:          # A. 带标签
+        mcn, mbo = RE_LBL_CN.search(line), RE_LBL_BO.search(line)
+        cn = _clean_cn(mcn.group(1)) if mcn else ""
+        bo = RE_TAG.sub("", mbo.group(1)).strip() if mbo else ""
+        return cn, bo
+    # B. 无标签·按位置：<br><br> 分段，取含汉字段=中文、含藏文段=藏文
+    parts = [p.strip() for p in RE_BR.split(body) if p.strip()]
+    cn = next((_clean_cn(p) for p in parts if _has_han(p)), "")
+    bo = next((RE_TAG.sub("", p).strip() for p in parts if _has_bo(p)), "")
+    return cn, bo
+
+
+def parse(path: Path):
+    acc = {}      # 归一藏文形 -> {"raw":原形, "cn":[中文…]}
     for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.lstrip().startswith("<b>"):
+        cn, bo = _parse_line(line)
+        if not cn or not bo:
             continue
-        mcn, mbo = RE_CN.search(line), RE_BO.search(line)
-        if not mbo:
-            continue
-        cn = _clean(mcn.group(1)) if mcn else ""
-        if not cn:
-            continue
-        msa = RE_SA.search(line)
-        sa = _clean(msa.group(1)) if msa else ""
-        bo_field = RE_TAG.sub("", mbo.group(1)).strip()
-        for form in bo_field.split():          # 多个藏文形以空格分隔
+        for form in RE_BO_SPLIT.split(bo):
             form = nfc(form).strip()
-            if not form:
+            if not form or not _has_bo(form):
                 continue
             key = lookup_key(form)
-            if not key or not any(0x0F00 <= ord(c) <= 0x0FFF for c in key):
+            if not key or not _has_bo(key):
                 continue
-            rec = acc.setdefault(key, {"raw": form.rstrip("།").rstrip("་"),
-                                       "cn": [], "sa": []})
+            rec = acc.setdefault(key, {"raw": form.rstrip("།").rstrip("་"), "cn": []})
             if cn not in rec["cn"]:
                 rec["cn"].append(cn)
-            for one in (x.strip() for x in sa.split(",")):
-                if one and one not in rec["sa"]:
-                    rec["sa"].append(one)
     return acc
 
 
@@ -76,18 +86,16 @@ def main():
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
 
-    acc = parse(args.src, args.source)
+    acc = parse(args.src)
     n = 0
     with args.out.open("w", encoding="utf-8") as f:
         for key, rec in sorted(acc.items()):
-            sa = "；".join(rec["sa"])
             rec_out = {
                 "headword": key,
                 "headword_raw": rec["raw"],
                 "source": args.source,
-                "pos": sa,
                 "senses": rec["cn"],
-                "full_text": "；".join(rec["cn"]) + (f"｜梵：{sa}" if sa else ""),
+                "full_text": "；".join(rec["cn"]),
             }
             f.write(json.dumps(rec_out, ensure_ascii=False) + "\n")
             n += 1

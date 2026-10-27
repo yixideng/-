@@ -20,8 +20,8 @@ from normalize import lookup_key, nfc  # noqa: E402
 DICT_DBS = [
     ("藏汉大辞典", ROOT / "data/processed/dict.sqlite"),
     ("格西曲扎", ROOT / "data/processed/gexi.sqlite"),
-    # ("瑜伽师地论词汇表", ROOT / "data/processed/yogacarabhumi.sqlite"),   # 待入库
-    ("宝性论大疏词汇表", ROOT / "data/processed/ratnagotra_glossary.sqlite"),  # ④(≠tm_baoxinglun译例)
+    ("瑜伽师地论词汇表", ROOT / "data/processed/yogacarabhumi_glossary.sqlite"),  # ③
+    ("宝性论大疏词汇表", ROOT / "data/processed/ratnagotra_glossary.sqlite"),      # ④(≠tm_baoxinglun译例)
 ]
 # 词源→优先级序号（越小越权威），供 lookup_dict 结果排序，保证主辞典恒居首。
 # 键用「数据库 entries.source 的实际值」（非 DICT_DBS 标签），否则对不上。
@@ -31,7 +31,7 @@ DICT_DBS = [
 _DICT_SOURCE_ORDER = [
     "藏汉大辞典",
     "格西曲扎藏文词典",
-    # "瑜伽师地论词汇表",      # 待入库
+    "瑜伽师地论词汇表",        # ③(entries.source 实际值)
     "宝性论大疏词汇表",        # ④(entries.source 实际值)
     "甘肃版藏汉词典",          # 用户次序外·暂置名列诸典之后
 ]
