@@ -1,5 +1,7 @@
 # 可再生的大文件产物（词典库/翻译记忆，脚本随时重建）
-/data/processed/
+/data/processed/*
+# 例外：宝性论大疏词汇表 jsonl 进 Git（无 Release 可用·体量小·build_index 一步重建 sqlite）
+!/data/processed/ratnagotra_glossary.jsonl
 # 注：人工修订的核心资产不放这里，放 /glossary 与 /review（均进仓库）
 /data/eval/
 # 大体量原始素材：只提交样本，完整词典/语料本地保存，勿入库

@@ -14,15 +14,16 @@
 
 多部字典义项相异时，**以靠前者为准，余典作旁参**。次序：
 
-1. **藏汉大辞典**（最主要·主辞典）
-2. **格西曲扎藏文辞典**
+1. **藏汉大辞典**（最主要·主辞典）✅ `dict.sqlite`
+2. **格西曲扎藏文辞典** ✅ `gexi.sqlite`
 3. **瑜伽师地论词汇表**（⬜ 尚未入库，需原始词表文件）
-4. **宝性论大疏词汇表**（⬜ 尚未入库；注意 `tm_baoxinglun` 是**译例**非词汇表）
+4. **宝性论大疏词汇表** ✅ `ratnagotra_glossary.sqlite`（梵-中-藏 MDX 导出·按【藏文】反向建索引·1661 词头；**≠** `tm_baoxinglun` 译例）
 
 实现：`agent/tools.py` 的 `DICT_DBS` 按此次序排列，`DICT_PRIORITY`（键＝数据库 `entries.source` 实际值）令
 `lookup_dict` 结果稳定排序、主辞典恒居首；`translator.py` 资料包「词典释义」节标明取义优先级。
-现仅①②已入库（`dict.sqlite` 含「藏汉大辞典」与「甘肃版藏汉词典」两部，`gexi.sqlite` 为格西曲扎）；
-「甘肃版藏汉词典」不在用户次序内，暂置于已命名诸典之后。③④备到即解析入库、按位插入。
+现①②④已入库（`dict.sqlite` 含「藏汉大辞典」与「甘肃版藏汉词典」两部，`gexi.sqlite` 为格西曲扎，
+`ratnagotra_glossary.sqlite` 为宝性论大疏词汇表）；「甘肃版藏汉词典」不在用户次序内，暂置于已命名诸典之后。
+③瑜伽师地论词汇表备到即解析入库、插入②④之间。
 
 ## 多项目（同一知识库，多本经论互不污染）
 
@@ -60,7 +61,7 @@
 词典库/翻译记忆是**可再生的大文件**，不进 Git，容器重置后会消失。开工前先检查：
 
 ```bash
-ls -lh data/processed/dict.sqlite data/processed/gexi.sqlite 2>/dev/null
+ls -lh data/processed/dict.sqlite data/processed/gexi.sqlite data/processed/ratnagotra_glossary.sqlite 2>/dev/null
 ```
 
 **若不存在，先重建**（原始素材在本仓库的 GitHub Release，持久保存）：
@@ -79,6 +80,12 @@ curl -sSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet
   -o data/raw/dictionaries/gexi_full.txt
 python3 pipeline/parse_gexi.py data/raw/dictionaries/gexi_full.txt --out data/processed/gexi.jsonl
 python3 pipeline/build_index.py data/processed/gexi.jsonl --out data/processed/gexi.sqlite
+
+# 2b. 宝性论大疏词汇表（④）：jsonl 已在 Git（无 Release），直接建 sqlite 即可
+python3 pipeline/build_index.py data/processed/ratnagotra_glossary.jsonl --out data/processed/ratnagotra_glossary.sqlite
+#   ↑ 若需从原始 MDX 重新解析（原始 .txt 在本地 data/raw/dictionaries/，未入 Git）：
+#   python3 pipeline/parse_mdx_glossary.py data/raw/dictionaries/ratnagotra_glossary_mdx.txt \
+#     --source 宝性论大疏词汇表 --out data/processed/ratnagotra_glossary.jsonl
 
 # 3. 译例（翻译记忆）
 curl -sSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
