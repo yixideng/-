@@ -240,6 +240,22 @@ def _clean_draft(text: str) -> str:
     return "\n".join(lines[start:]).strip()
 
 
+_FW_PUNCT = {",": "，", ";": "；", ":": "：", "!": "！", "?": "？", "(": "（", ")": "）"}
+
+
+def _fullwidth_cn(text: str) -> str:
+    """译文一律用中文全角标点（用户裁定·恒常）。逐行处理：仅对含汉字(CJK)的行
+    把半角 , ; : ! ? ( ) 转全角；藏文行(无汉字)不动。半角句点 . 不转，以免伤
+    『6.12』『Mīmāṃsā.』等数字/梵文转写。全角引号「」『』、顿号、书名号模型已用。"""
+    def is_cjk(c): return 0x4E00 <= ord(c) <= 0x9FFF or 0x3400 <= ord(c) <= 0x4DBF
+    out = []
+    for ln in text.splitlines():
+        if any(is_cjk(c) for c in ln):
+            ln = "".join(_FW_PUNCT.get(c, c) for c in ln)
+        out.append(ln)
+    return "\n".join(out)
+
+
 def _split_tail(text: str):
     """切出正文与文末『校勘/校订/译注/按语』节（后者原样保留、不参与段级对齐）。"""
     lines = text.splitlines()
@@ -355,6 +371,8 @@ def main():
             tag = "全段采纳" if fb == 0 else f"{fb} 段对不上·已回退该段直译"
             print(f"（语法适配遍：{_bo_line_count(draft)} 段·{tag}）", file=sys.stderr)
 
+    out = _fullwidth_cn(out)          # 译文定稿一律中文全角标点（用户裁定·恒常）
+    draft = _fullwidth_cn(draft)
     if args.out:
         args.out.write_text(out + "\n", encoding="utf-8")
         print(f"译文已写入 {args.out}")
