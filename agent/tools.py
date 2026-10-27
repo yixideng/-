@@ -13,10 +13,30 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "pipeline"))
 from normalize import lookup_key, nfc  # noqa: E402
 
+# 查词优先级（用户裁定·恒常·防词义飘移）：列表次序＝取义权威次序。
+# 多典义项相异时以靠前者为准，余典作旁参。
+#   ① 藏汉大辞典（最主要·主辞典） ② 格西曲扎藏文辞典
+#   ③ 瑜伽师地论词汇表 ④ 宝性论大疏词汇表  ←（③④原始数据尚未入库；备到即按此位插入）
 DICT_DBS = [
     ("藏汉大辞典", ROOT / "data/processed/dict.sqlite"),
     ("格西曲扎", ROOT / "data/processed/gexi.sqlite"),
+    # ("瑜伽师地论词汇表", ROOT / "data/processed/yogacarabhumi.sqlite"),   # 待入库
+    # ("宝性论大疏词汇表", ROOT / "data/processed/ratnagotra_glossary.sqlite"),  # 待入库(≠tm_baoxinglun译例)
 ]
+# 词源→优先级序号（越小越权威），供 lookup_dict 结果排序，保证主辞典恒居首。
+# 键用「数据库 entries.source 的实际值」（非 DICT_DBS 标签），否则对不上。
+# 用户裁定次序：藏汉大辞典＞格西曲扎藏文词典＞〔瑜伽师地论词汇表＞宝性论大疏词汇表·待入库〕。
+# 「甘肃版藏汉词典」(与藏汉大辞典同库的另一部)未在用户次序内，暂置于已命名诸典之后(默认·待确认)；
+# 未列出的词源(含空 source)一律落末，组内保持原检索序(稳定排序)。
+_DICT_SOURCE_ORDER = [
+    "藏汉大辞典",
+    "格西曲扎藏文词典",
+    # "瑜伽师地论词汇表",      # 待入库
+    # "宝性论大疏词汇表",      # 待入库(≠ tm_baoxinglun 译例)
+    "甘肃版藏汉词典",          # 用户次序外·暂置名列诸典之后
+]
+DICT_PRIORITY = {name: i for i, name in enumerate(_DICT_SOURCE_ORDER)}
+_DICT_PRIORITY_FALLBACK = len(_DICT_SOURCE_ORDER)
 # ========== 多项目：共享底座 + 分项目层 ==========
 # 词典(DICT_DBS)与流水线代码 = 两项目共享。
 # 术语库/翻译记忆/笔记 = 「共享基础 + 项目覆盖」：新项目(如时轮)复用胜乘中观积累的
@@ -208,6 +228,8 @@ def lookup_dict(word: str, compact=True):
                     results += _query_db(db, stem)
                 if results:
                     break
+    # 按查词优先级稳定排序：主辞典（藏汉大辞典）义项恒居首，余典依次旁参（防飘移）。
+    results.sort(key=lambda r: DICT_PRIORITY.get(r["source"], _DICT_PRIORITY_FALLBACK))
     if compact:
         for r in results:
             senses = json.loads(r["senses"])

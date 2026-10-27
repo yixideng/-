@@ -152,7 +152,8 @@ def build_packet(text: str) -> str:
             i += len(matched[0].split("་"))
         else:
             i += 1
-    lines.append("\n## 词典释义（参考）\n")
+    lines.append("\n## 词典释义（参考·取义优先级：藏汉大辞典＞格西曲扎；"
+                 "同词多典义项相异时，以靠前者〔尤藏汉大辞典〕为准，余典作旁参，勿随后典飘移）\n")
     for word, entries in dict_hits[:25]:
         for e in entries[:2]:
             sense = "；".join(e["senses"])[:150]
