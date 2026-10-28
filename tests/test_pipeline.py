@@ -126,24 +126,24 @@ class TestPolishMerge(unittest.TestCase):
     P = ("ཀ་ཁ་ག་ང་ཅ་ཆ།\n甲润色。\n\nཇ་ཉ་ཏ་ཐ་ད་ན།\n乙润色。\n\nཔ་ཕ་བ་མ་ཙ་ཚ།\n丙润色。")
 
     def test_exact(self):
-        out, fb = tr._merge_polished(self.D, self.P)
+        out, fb, _ = tr._merge_polished(self.D, self.P)
         self.assertEqual(fb, 0)
         self.assertIn("乙润色", out)
 
     def test_missing_blank_lines(self):
-        out, fb = tr._merge_polished(self.D, self.P.replace("\n\n", "\n"))
+        out, fb, _ = tr._merge_polished(self.D, self.P.replace("\n\n", "\n"))
         self.assertEqual(fb, 0)
 
     def test_tibetan_drift_keeps_draft_tibetan(self):
         drifted = self.P.replace("ཇ་ཉ་ཏ་ཐ་ད་ན།", "ཇ་ཉ་ཏ་ཐ་ད།")
-        out, fb = tr._merge_polished(self.D, drifted)
+        out, fb, _ = tr._merge_polished(self.D, drifted)
         self.assertEqual(fb, 0)
         self.assertIn("ཇ་ཉ་ཏ་ཐ་ད་ན།", out)          # 藏文行取直译稿原文
         self.assertNotIn("ཇ་ཉ་ཏ་ཐ་ད།\n", out)
 
     def test_missing_segment_falls_back(self):
         p = "ཀ་ཁ་ག་ང་ཅ་ཆ།\n甲润色。\n\nཔ་ཕ་བ་མ་ཙ་ཚ།\n丙润色。"
-        out, fb = tr._merge_polished(self.D, p)
+        out, fb, _ = tr._merge_polished(self.D, p)
         self.assertEqual(fb, 1)
         self.assertIn("乙直译", out)
         self.assertIn("丙润色", out)
@@ -181,6 +181,115 @@ class TestTmNaming(unittest.TestCase):
             self.skipTest("未重建")
         missing = [p.name for p in tmlib.parallels("gzhanstong") if not tmlib.tm_path(p).exists()]
         self.assertEqual(missing, [])
+
+
+
+# ===== 外部评审修复（失败发声·词典选词·IDF检索·质检·多义五五开）=====
+import os  # noqa: E402
+import stat  # noqa: E402
+import tempfile  # noqa: E402
+
+
+class TestLoudFailures(unittest.TestCase):
+    def _fake_cli(self, body):
+        d = tempfile.mkdtemp()
+        p = Path(d) / "claude"
+        p.write_text("#!/bin/sh\n" + body + "\n", encoding="utf-8")
+        p.chmod(p.stat().st_mode | stat.S_IEXEC)
+        return d
+
+    def _run_with(self, d):
+        old = os.environ["PATH"]
+        os.environ["PATH"] = d + os.pathsep + old
+        try:
+            return tr._run_claude("x", "", "g")
+        finally:
+            os.environ["PATH"] = old
+
+    def test_nonzero_exit_raises_not_returns_stderr(self):
+        d = self._fake_cli('echo "API Error: overloaded" >&2\nexit 1')
+        with self.assertRaises(tr.ModelCallError):
+            self._run_with(d)
+
+    def test_empty_output_raises(self):
+        with self.assertRaises(tr.ModelCallError):
+            self._run_with(self._fake_cli("exit 0"))
+
+    def test_is_error_json_raises(self):
+        d = self._fake_cli('echo \'{"is_error": true, "result": "Credit balance too low"}\'')
+        with self.assertRaises(tr.ModelCallError):
+            self._run_with(d)
+
+    def test_ok_json_returns_result_and_records_usage(self):
+        d = self._fake_cli('echo \'{"result": "译文", "usage": {"input_tokens": 10, '
+                           '"cache_creation_input_tokens": 5, "cache_read_input_tokens": 0, '
+                           '"output_tokens": 3}, "total_cost_usd": 0.01}\'')
+        n = len(tr.USAGE)
+        self.assertEqual(self._run_with(d), "译文")
+        self.assertEqual(tr.USAGE[-1]["in"], 15)
+        self.assertEqual(len(tr.USAGE), n + 1)
+
+    def test_resource_status_reports_missing_dict(self):
+        saved = tools.DICT_DBS
+        try:
+            tools.DICT_DBS = [("不存在的字典", ROOT / "data/processed/__nope__.sqlite")]
+            self.assertTrue(any("不存在的字典" in m for m in tools.resource_status()["missing"]))
+        finally:
+            tools.DICT_DBS = saved
+
+
+class TestDictSelection(unittest.TestCase):
+    def test_rarest_kept_common_dropped_with_footer(self):
+        saved, saved_max = tools._tm_corpus, tr.DICT_MAX
+        try:
+            tools._tm_corpus = "ཀཀ " * 50 + "ཁཁ " * 20
+            tr.DICT_MAX = 1
+            mk = lambda s: [{"source": "藏汉大辞典", "senses": [s]}]
+            out = tr.render_dict_hits([("ཀཀ", mk("常见")), ("གག", mk("罕见")), ("ཁཁ", mk("次常见"))])
+            self.assertTrue(any("གག" in l for l in out))
+            self.assertFalse(any(l.startswith("- ཀཀ") for l in out))
+            self.assertIn("另有 2 个较常见词从略", out[-1])
+        finally:
+            tools._tm_corpus, tr.DICT_MAX = saved, saved_max
+
+
+@unittest.skipUnless(list((ROOT / "data/processed").glob("tm_gzhanstong_*.jsonl")), "译例未建")
+class TestIdfRetrieval(unittest.TestCase):
+    def test_rare_word_wins_over_boilerplate(self):
+        q = ("དཔེར་ན། འཕགས་པ་ཤཱ་རིའི་བུས་ཆོས་བསྟན་ཞེས་བརྗོད་དགོས་པ་ནི། དོན་ལ་དེའི་གཟུགས་དང༌། "
+             "ཚོར་བ་དང༌། འདུ་ཤེས་དང༌། འདུ་བྱེད་དང༌། རྣམ་པར་ཤེས་པ་སྟེ། ཕུང་པོ་ལྔ")
+        top = tools.search_tm(q, k=1)[0]
+        self.assertIn("舍利弗", top["zh"])
+
+
+class TestQaAndShrink(unittest.TestCase):
+    BO = "ཀ་ཁ་ག་ང་ཅ་ཆ་ཇ་ཉ་ཏ་ཐ་ད་ན་པ་ཕ་བ་མ་ཙ་ཚ་ཛ་ཝ།"
+
+    def test_swallowed_segment_flagged(self):
+        iss = tr.qa_check(self.BO + "\n甲。")
+        self.assertTrue(any("疑漏译" in x for x in iss))
+
+    def test_normal_length_not_flagged(self):
+        iss = tr.qa_check(self.BO + "\n" + "译" * 20 + "。")
+        self.assertFalse(any("疑漏译" in x for x in iss))
+
+    def test_polish_shrink_falls_back(self):
+        d = self.BO + "\n" + "直" * 40 + "。"
+        p = self.BO + "\n" + "润" * 10 + "。"
+        out, fb, notes = tr._merge_polished(d, p)
+        self.assertEqual(fb, 1)
+        self.assertIn("直" * 40, out)
+        self.assertTrue(any("疑吞句" in n for n in notes))
+
+
+class TestNearTieAuto(unittest.TestCase):
+    def test_near_tie_auto_becomes_multi(self):
+        es = [E("体性", 39, "宝性论大疏", 1), E("自体", 31, "宝性论大疏", 2)]
+        self.assertTrue(tools._resolve_gloss(es)[2])
+
+    def test_clear_auto_winner_forced(self):
+        es = [E("世俗", 65, "宝性论大疏", 1), E("俗谛", 14, "宝性论大疏", 2)]
+        self.assertFalse(tools._resolve_gloss(es)[2])
 
 
 if __name__ == "__main__":

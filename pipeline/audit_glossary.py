@@ -10,6 +10,7 @@
 
 用法：
     python3 pipeline/audit_glossary.py              # 只出报告
+    python3 pipeline/audit_glossary.py --conflicts  # 一词多译词头如何取舍（透明报告）
     python3 pipeline/audit_glossary.py --apply      # 按阈值落盘降级
     python3 pipeline/audit_glossary.py --min-n 5 --zero-n 3 --max-rate 0.34
 """
@@ -68,14 +69,54 @@ def user_tier_wins(bo):
     return any(r[0] == bo and len(r) > 3 and ("用户" in r[3] or "校订本" in r[3]) for r in rows)
 
 
+def conflicts_report():
+    """透明报告：凡同一藏文词有多个不同核心译名者，列出系统如何取舍（防「静默丢弃」）。"""
+    from collections import defaultdict
+    g = tools.load_glossary()
+    by = defaultdict(list)
+    for i, line in enumerate(GLOSSARY.read_text(encoding="utf-8").splitlines()):
+        r = line.split("\t")
+        if i == 0 or len(r) < 3:
+            continue
+        by[r[0]].append(tools._gloss_entry(r[1], int(r[2]) if r[2].isdigit() else 0,
+                                           r[3] if len(r) > 3 else "", i))
+    kinds = {"多义列举(不强制·全部义项入资料包)": [], "强制·用户/人工定名取代低层": [],
+             "强制·纯自动取频次最高(余义不显示)": [], "降级参考(不进资料包)": []}
+    names = {3: "用户", 2: "人工", 1: "自动", 0: "参考"}
+    for bo, es in sorted(by.items()):
+        cores = {e.core for e in es}
+        if len(cores) < 2:
+            continue
+        v = g.get(bo)
+        alts = "、".join(f"{e.core}〔{names[e.tier]}·{e.freq}〕" for e in sorted(es, key=lambda e: (-e.tier, -e.freq)))
+        if v is None:
+            k = "降级参考(不进资料包)"
+        elif v[2]:
+            k = "多义列举(不强制·全部义项入资料包)"
+        elif max(e.tier for e in es) >= 2:
+            k = "强制·用户/人工定名取代低层"
+        else:
+            k = "强制·纯自动取频次最高(余义不显示)"
+        chosen = "—" if v is None else tools._CORE_CUT.split(v[0], 1)[0]
+        kinds[k].append(f"  {bo}：采用「{chosen}」 ← {alts}")
+    print(f"一词多译词头共 {sum(map(len, kinds.values()))} 个，取舍如下：")
+    for k, items in kinds.items():
+        print(f"\n## {k}：{len(items)} 个")
+        print("\n".join(items))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true", help="落盘降级")
+    ap.add_argument("--conflicts", action="store_true", help="只列一词多译词头的取舍（透明报告）")
     ap.add_argument("--min-n", type=int, default=5, help="触发≥此次数才按命中率评")
     ap.add_argument("--zero-n", type=int, default=3, help="触发≥此次数且零命中亦降级")
     ap.add_argument("--max-rate", type=float, default=0.34, help="命中率低于此值降级为参考(不进资料包)")
     ap.add_argument("--soft-rate", type=float, default=0.60, help="命中率介于max~soft之间→改多义·非强制(仍提示)")
     args = ap.parse_args()
+    if args.conflicts:
+        conflicts_report()
+        return
 
     g, stat = audit()
     rows = [l.split("\t") for l in GLOSSARY.read_text(encoding="utf-8").splitlines()]

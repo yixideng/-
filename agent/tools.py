@@ -251,8 +251,14 @@ def _resolve_gloss(es):
         return None                                  # 交由词典＋译例供义，免低命中译名继续误导
     if len(cores) == 1:                              # 只有一个核心译名→强制
         return best.zh, freq, False
-    if best.tier == 1:                               # 纯自动条目间冲突→沿旧规取频次最高强制
-        return best.zh, freq, False
+    if best.tier == 1:                               # 纯自动条目间冲突→取频次最高强制；
+        by_core = {}                                 # 但若次高义频次≥最高之半（如 ངོ་བོ 体性39/自体31），
+        for e in es:                                 # 属五五开的语境多义，改多义列举不强制
+            if e.tier >= 1:
+                by_core[e.core] = max(by_core.get(e.core, 0), e.freq)
+        top2 = sorted(by_core.values(), reverse=True)[:2]
+        if len(top2) < 2 or top2[1] < 0.5 * top2[0]:
+            return best.zh, freq, False
     top = [e for e in es if e.tier == best.tier]
     if len({e.core for e in top}) == 1 and not any(e.ctx for e in top):
         return best.zh, freq, False                  # 最高层单一定名→取代低层（替换型纠正）
@@ -264,6 +270,22 @@ def _resolve_gloss(es):
         seen.add(e.core)
         senses.append(e.zh if len(e.zh) <= 90 else e.zh[:88] + "…")
     return "｜".join(senses), freq, True
+
+
+def resource_status() -> dict:
+    """流水线资源体检：返回各项是否就位。缺任何一项，翻译即「裸跑」——
+    模型不会说它没查到词，只会凭自身知识补，故须在开跑前大声报错（见 translator.preflight）。"""
+    missing = [f"字典「{n}」({p.name})" for n, p in DICT_DBS if not p.exists()]
+    tm_files = [p for p in _cfg()["tm"] if p.exists()]
+    tm_n = len(load_tm())
+    if tm_n == 0:
+        missing.append("译例（翻译记忆）0 条")
+    gl_n = len(load_glossary())
+    if gl_n == 0:
+        missing.append("术语库 0 条")
+    missing += [f"笔记 {p.name}" for p in project_notes() if not p.exists()]
+    return {"dicts": f"{sum(p.exists() for _, p in DICT_DBS)}/{len(DICT_DBS)}",
+            "tm_files": len(tm_files), "tm": tm_n, "glossary": gl_n, "missing": missing}
 
 
 def scan_glossary(bo_text: str, max_len=8):
@@ -324,17 +346,54 @@ def load_tm():
     return _tm_cache
 
 
+_tm_corpus = None
+
+
+def tm_corpus() -> str:
+    """全部译例藏文拼成一串，供估计词的「常见度」（词典释义按罕见度挑词用）。"""
+    global _tm_corpus
+    if _tm_corpus is None:
+        _tm_corpus = "\n".join(e["bo"] for e in load_tm())
+    return _tm_corpus
+
+
+_tm_idf = None
+
+
+def _idf():
+    """译例语料的音节 IDF：དེ/པ/ནི 等高频虚字权重近零，罕见实词权重高。"""
+    global _tm_idf
+    if _tm_idf is None:
+        import math
+        from collections import Counter
+        tm = load_tm()
+        n = len(tm)
+        df = Counter(w for e in tm for w in e["_syls"])
+        _tm_idf = ({w: math.log((n + 1) / (c + 0.5)) for w, c in df.items()}, math.log(n + 1))
+    return _tm_idf
+
+
+TM_MIN_SCORE = 0.11   # IDF 加权分的入选下限（约当旧「音节 Jaccard≥0.15」）
+
+
 def search_tm(bo_text: str, k=3):
-    """按音节 Jaccard 相似度检索最像的历史译例。数据量小，线性扫即可。"""
+    """IDF 加权音节 Jaccard 检索最像的历史译例。
+    旧法为无权 Jaccard：短查询里 དེ/པ/ནི 等高频虚字占满分子分母，科判套话、品末结语等
+    短句易被误选（外部评审实测）。今按 IDF 加权，并在长查询（≥30 音节）时略去极短译例（<8 音节）。
+    留出测试（≥30 音节查询）：top1 与正解汉译相似度 0.279→0.294。"""
     q = set(syllables(bo_text))
     if not q:
         return []
+    idf, unk = _idf()
+    long_q = len(q) >= 30
     scored = []
     for s in load_tm():
-        inter = len(q & s["_syls"])
-        if inter < 2:
+        d = s["_syls"]
+        inter = q & d
+        if len(inter) < 2 or (long_q and len(d) < 8):
             continue
-        score = inter / len(q | s["_syls"])
+        den = sum(idf.get(w, unk) for w in q | d)
+        score = sum(idf.get(w, unk) for w in inter) / den if den else 0.0
         scored.append((score, s))
     scored.sort(key=lambda x: -x[0])
     return [{"score": round(sc, 3), "bo": s["bo"][:200], "zh": s["zh"][:200],

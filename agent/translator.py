@@ -12,6 +12,7 @@
     python agent/translator.py --text "..." --out result.md
 """
 import argparse
+import json
 import re
 import subprocess
 import sys
@@ -135,10 +136,46 @@ def select_fayi(body: str, src: str, recent: int = 3, related: int = 3) -> str:
     return "".join(general) + note + "".join(picked)
 
 
-def build_packet(text: str) -> str:
+DICT_MAX = 60      # 词典释义最多列词数（按译例语料罕见度挑难词，非按文中先后截断）
+MORPH_MAX = 20
+
+
+def render_dict_hits(dict_hits):
+    """词典释义：命中常达数百词，不能全列（会撑爆资料包），亦不可按文中先后静默截断
+    （旧法 dict_hits[:25]：6.12 命中 301 词只列前 25，后文难词如「增一阿含」「卸担」全丢）。
+    改按「在已译语料中的出现次数」升序挑最罕见的 DICT_MAX 个——常见词早有译例/术语定译，
+    罕见词才最需词典；按原文次序列出，每词一行：主典义 ＋ 余典之简短汉译旁参；从略者明示数目。"""
+    if not dict_hits:
+        return ["（无词典命中）"]
+    corpus = tools.tm_corpus()
+    pick = set(w for w, _ in sorted(dict_hits, key=lambda h: corpus.count(h[0]))[:DICT_MAX])
+    out = []
+    for word, entries in dict_hits:
+        if word not in pick:
+            continue
+        main = entries[0]
+        line = f"- {word}〔{main['source']}〕" + "；".join(main["senses"])[:100]
+        extra = []
+        for e in entries[1:]:
+            short = "；".join(e["senses"])
+            if e["source"] != main["source"] and len(short) <= 24 and \
+                    any(0x4E00 <= ord(c) <= 0x9FFF for c in short):
+                extra.append(f"{e['source'][:4]}：{short}")
+        if extra:
+            line += "｜旁参 " + "｜".join(extra[:2])
+        out.append(line)
+    if len(dict_hits) > len(pick):
+        out.append(f"（另有 {len(dict_hits) - len(pick)} 个较常见词从略——已有译例/术语可循）")
+    return out
+
+
+def build_packet(text: str, missing=None) -> str:
     segs = split_segments(text)
     lines = []
     lines.append(PROMPT_FILE.read_text(encoding="utf-8"))
+    if missing:
+        lines.append("\n> ⚠ **资料缺失**：" + "；".join(missing) +
+                     "。本次词典/译例等可能为空——遇无据之词须在校勘中标明「无词典依据」，勿凭空定名。\n")
     # 笔记层：法义纲要 + 句法通则（恒常注入，先于原文，供全篇遵循）——按当前项目取
     for nf in tools.project_notes():
         if nf.exists():
@@ -187,12 +224,9 @@ def build_packet(text: str) -> str:
             i += len(matched[0].split("་"))
         else:
             i += 1
-    lines.append("\n## 词典释义（参考·取义优先级：藏汉大辞典＞格西曲扎；"
+    lines.append("\n## 词典释义（参考·取义优先级：藏汉大辞典＞格西曲扎＞瑜伽师地论词汇表＞宝性论大疏词汇表；"
                  "同词多典义项相异时，以靠前者〔尤藏汉大辞典〕为准，余典作旁参，勿随后典飘移）\n")
-    for word, entries in dict_hits[:25]:
-        for e in entries[:2]:
-            sense = "；".join(e["senses"])[:150]
-            lines.append(f"- {word}〔{e['source']}〕{sense}")
+    lines += render_dict_hits(dict_hits)
 
     # 逐字参考（兜底·治「术语表词汇有限」）：既未命中术语表、又未作为复合词命中词典的
     # 「实词单字」，拆开逐字查词典，给模型合成的原料——如 ཡོངས＝周遍、དཔྱོད＝观察 → 周遍观察，
@@ -217,15 +251,17 @@ def build_packet(text: str) -> str:
                 break
     if morph_hits:
         lines.append("\n## 逐字参考（复合词未成词条时，供逐字合成；非强制，仅作原料）\n")
-        for syl, form, sense in morph_hits[:20]:
+        for syl, form, sense in morph_hits[:MORPH_MAX]:
             tag = f"〔查 {form}〕" if form != syl else ""
             lines.append(f"- {syl}{tag} → {sense}")
+        if len(morph_hits) > MORPH_MAX:
+            lines.append(f"（另有 {len(morph_hits) - MORPH_MAX} 个单字从略）")
 
     # 相似译例
     lines.append("\n## 参考译例（同一译者已定稿译本，模仿其文体）\n")
     for i, s in enumerate(segs, 1):
         for ex in tools.search_tm(s, k=2):
-            if ex["score"] >= 0.15:
+            if ex["score"] >= tools.TM_MIN_SCORE:
                 lines.append(f"- 〔{ex['source']}｜相似度{ex['score']}〕")
                 lines.append(f"  藏：{ex['bo']}")
                 lines.append(f"  汉：{ex['zh']}")
@@ -237,13 +273,62 @@ def build_packet(text: str) -> str:
 # 内层 claude 只做「纯文本任务」：prompt 已自带全部资料。关键防护：①在中性目录运行，避免加载
 # 本仓库 CLAUDE.md（其"必须走流水线"会让内层误去递归跑 pipeline、卡在权限询问而非干活）；
 # ②append-system-prompt 明确其唯一任务、禁用工具与反问。
+class ModelCallError(RuntimeError):
+    """模型调用失败。绝不可把 stderr 当译文返回（曾 `stdout or stderr`，失败时静默产出报错文字当稿）。"""
+
+
+USAGE = []            # 每次模型调用的真实用量（供体积/费用监测）
+INPUT_WARN = 150_000  # 单次输入 token 超此值告警（防笔记膨胀撞上下文上限）
+
+
 def _run_claude(prompt: str, model: str, guard: str) -> str:
-    cmd = ["claude", "-p", "--append-system-prompt", guard]
+    """调内层 claude 做纯文本任务。
+    --system-prompt 取代 Claude Code 默认系统提示、--tools "" 禁用全部工具：实测「只答一字」的
+    固定开销由 35,784 降至 1,527 输入 token（工具定义占绝大部分），每段两遍省约 7 万 token，
+    亦根除内层模型擅调工具/跑流水线之患。--output-format json 取真实用量。"""
+    cmd = ["claude", "-p", "--system-prompt", guard, "--tools", "",
+           "--output-format", "json"]
     if model:
         cmd += ["--model", model]
-    r = subprocess.run(cmd, input=prompt, capture_output=True, text=True,
-                       timeout=3000, cwd=tempfile.gettempdir())
-    return r.stdout.strip() or r.stderr.strip()
+    try:
+        r = subprocess.run(cmd, input=prompt, capture_output=True, text=True,
+                           timeout=3000, cwd=tempfile.gettempdir())
+    except FileNotFoundError:
+        raise ModelCallError("找不到 claude CLI（须安装并登录）")
+    except subprocess.TimeoutExpired:
+        raise ModelCallError("模型调用超时（3000 秒）")
+    raw = r.stdout.strip()
+    try:
+        d = json.loads(raw)
+    except ValueError:
+        raise ModelCallError(f"模型调用失败（exit={r.returncode}）：{((r.stderr or '') + raw).strip()[:400] or '无输出'}")
+    out = (d.get("result") or "").strip()
+    if r.returncode != 0 or d.get("is_error") or not out:
+        raise ModelCallError(f"模型调用失败（exit={r.returncode}）：{(out or r.stderr or '无输出').strip()[:400]}")
+    u = d.get("usage") or {}
+    tin = sum(u.get(k) or 0 for k in ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"))
+    rec = {"in": tin, "cache_read": u.get("cache_read_input_tokens") or 0,
+           "out": u.get("output_tokens") or 0, "usd": d.get("total_cost_usd") or 0.0}
+    USAGE.append(rec)
+    print(f"（模型调用：输入 {rec['in']:,} token〔缓存命中 {rec['cache_read']:,}〕·输出 {rec['out']:,}·"
+          f"${rec['usd']:.3f}）", file=sys.stderr)
+    if tin > INPUT_WARN:
+        print(f"⚠ 单次输入 {tin:,} token 超过告警线 {INPUT_WARN:,}：笔记/资料包过大，需精简", file=sys.stderr)
+    return out
+
+
+def preflight(allow_missing: bool) -> list:
+    """开跑前资源体检：打印摘要；缺字典/译例/术语/笔记即退出（除非 --allow-missing）。"""
+    st = tools.resource_status()
+    print(f"（资源：字典 {st['dicts']}·译例 {st['tm']} 条/{st['tm_files']} 文件·术语 {st['glossary']} 词头）",
+          file=sys.stderr)
+    if st["missing"]:
+        msg = "资源缺失：" + "；".join(st["missing"])
+        if not allow_missing:
+            sys.exit(f"✗ {msg}\n  请先运行 python3 pipeline/rebuild.py 重建；"
+                     "确需裸跑请加 --allow-missing（译文可信度下降）。")
+        print(f"⚠ {msg}（--allow-missing：强行继续）", file=sys.stderr)
+    return st["missing"]
 
 
 def _bo_line_count(text: str) -> int:
@@ -313,6 +398,35 @@ def _norm_bo(block: str) -> str:
     return ""
 
 
+SHRINK_MIN = 0.75     # 润色/直译汉字比下限（实测正常润色 119 段最低 0.89，中位 1.00）
+LEN_RATIO_MIN = 0.5   # 汉字/藏文音节比下限（用户校正版中位 0.88、1% 分位 0.62）→ 低于即疑漏译
+
+
+def _han(t: str) -> int:
+    return sum(1 for c in t if 0x4E00 <= ord(c) <= 0x9FFF)
+
+
+def qa_check(final: str) -> list:
+    """生成后忠实性质检（只报告，不改稿）：逐段查 ①强制术语是否落地 ②汉藏长度比是否异常（疑漏译）。
+    曾只校「藏文行数不变」，强制术语没落地、整句被吞都不会被发现。"""
+    issues = []
+    body, _ = _split_tail(final)
+    for i, (_k, txt) in enumerate(_bo_pairs(body), 1):
+        lines = txt.splitlines()
+        bo, zh = lines[0], "\n".join(lines[1:])
+        n_syl = len(tools.syllables(bo))
+        if n_syl >= 15 and _han(zh) < LEN_RATIO_MIN * n_syl:
+            issues.append(f"第{i}段 汉字/藏文音节 = {_han(zh) / n_syl:.2f}（基准 0.88），疑漏译")
+        for t_bo, t_zh, _f, multi in tools.scan_glossary(bo):
+            if multi:
+                continue
+            core = tools._CORE_CUT.split(t_zh, 1)[0]
+            alts = [a.strip(" 「」『』") for a in re.split(r"[／/、，,]", core) if a.strip()]
+            if alts and not any(a in zh for a in alts):
+                issues.append(f"第{i}段 强制术语未落地：{t_bo} → {core}")
+    return issues
+
+
 def _bo_pairs(body: str):
     """逐行切对照组（不依赖空行）：每个『纯藏文行』起一组，其后非藏文行（汉译）归入该组。
     返回 [(藏文骨架key, 组原文)]。润色稿常漏段间空行而粘成一块，按空行切会整篇对不上。"""
@@ -336,7 +450,8 @@ def _merge_polished(draft: str, polished: str):
     """段级对齐兜底：以直译稿段序为准，逐段取润色稿中对应段之汉译，对不上的个别段回退直译。
     三级匹配（曾因只认『藏文骨架全等＋空行切段』，6.10 润色 13 段全数回退）：
       ① 骨架全等；② 骨架近似（≥0.85，偏向保持顺序）；③ 两稿段数相同时按位置（骨架≥0.5）。
-    润色段若无汉译则视为对不上。返回 (合并稿, 回退段数)。"""
+    润色段若无汉译则视为对不上；汉字数缩到直译 SHRINK_MIN 以下视为疑吞句，亦回退。
+    返回 (合并稿, 回退段数, 说明列表)。"""
     from difflib import SequenceMatcher
     d_body, tail = _split_tail(draft)
     p_body, _ = _split_tail(polished)
@@ -347,7 +462,7 @@ def _merge_polished(draft: str, polished: str):
     for j, (k, _) in enumerate(p_pairs):
         exact.setdefault(k, j)
     same_len = len(p_pairs) == len(d_pairs)
-    used, merged, fallback, pos = set(), [], 0, 0
+    used, merged, fallback, pos, notes = set(), [], 0, 0, []
     for i, (k, txt) in enumerate(d_pairs):
         j = exact.get(k)
         if j is None or j in used:
@@ -372,14 +487,21 @@ def _merge_polished(draft: str, polished: str):
             # 藏文行一律取直译稿原文（润色只许改汉译），汉译取润色稿
             d_bo = txt.splitlines()[0]
             p_zh = "\n".join(p_pairs[j][1].splitlines()[1:]).strip()
+            d_n, p_n = _han("\n".join(txt.splitlines()[1:])), _han(p_zh)
+            if d_n >= 20 and p_n < SHRINK_MIN * d_n:      # 润色明显缩水＝疑吞句→回退该段直译
+                merged.append(txt)
+                fallback += 1
+                notes.append(f"第{i + 1}段 润色稿汉字仅直译稿的 {p_n / d_n:.0%}（疑吞句），回退直译")
+                continue
             merged.append(d_bo + "\n" + p_zh)
         else:
             merged.append(txt)
             fallback += 1
+            notes.append(f"第{i + 1}段 润色稿中对不上，回退直译")
     out = "\n\n".join(merged)
     if tail:
         out += "\n\n" + tail
-    return out, fallback
+    return out, fallback, notes
 
 
 def build_polish_packet(draft: str, src_text: str) -> str:
@@ -411,6 +533,8 @@ def main():
                     help="翻译后再跑一遍『文风润色』（默认开；--no-polish 关）。两阶段：准确直译→定稿体润色")
     ap.add_argument("--out", type=Path)
     ap.add_argument("--model", default="")
+    ap.add_argument("--allow-missing", action="store_true",
+                    help="资源（字典/译例/术语/笔记）缺失时仍强行运行（默认缺失即报错退出）")
     ap.add_argument("--project", default="gzhanstong",
                     help="翻译项目：gzhanstong(胜乘中观·默认) / kalacakra(时轮根本续)。"
                          "决定注入哪套笔记/译例/术语覆盖层；两本词典与共享术语库始终共用")
@@ -422,7 +546,8 @@ def main():
     if not text:
         ap.error("需要 --text 或 --file")
 
-    packet = build_packet(text)
+    missing = preflight(args.allow_missing)
+    packet = build_packet(text, missing)
     if args.packet:
         print(packet)
         return
@@ -432,7 +557,12 @@ def main():
               "唯一任务：按系统指令逐段输出藏汉逐段对照译文。"
               "第一行必须就是第一段藏文原文，严禁任何前言、自语、英文或说明；"
               "严禁调用任何工具、运行脚本或本仓库流水线，严禁询问权限或反问，直接输出译文。")
-    draft = _clean_draft(_run_claude(packet, args.model, guard1))   # 第一遍：准确直译（清洗稿首噪声）
+    try:
+        draft = _clean_draft(_run_claude(packet, args.model, guard1))   # 第一遍：准确直译（清洗稿首噪声）
+    except ModelCallError as e:
+        sys.exit(f"✗ 直译遍失败，未产出译文：{e}")
+    if not draft:
+        sys.exit("✗ 直译遍输出清洗后为空（无藏文对照行），未产出译文")
     out = draft
 
     if args.polish:
@@ -440,14 +570,20 @@ def main():
         guard2 = ("你是藏译汉定稿润色师。下方已含直译稿·文风笔记·术语约束。"
                   "唯一任务：只改汉译行文、不动义理/术语/格式（藏文行照抄），输出润色后的对照全文。"
                   "严禁调用任何工具或反问，直接输出。")
-        polished = _clean_draft(_run_claude(build_polish_packet(draft, text), args.model, guard2))
+        try:
+            polished = _clean_draft(_run_claude(build_polish_packet(draft, text), args.model, guard2))
+        except ModelCallError as e:
+            polished = ""
+            print(f"⚠ 润色遍失败，交付直译稿：{e}", file=sys.stderr)
         # 段级对齐兜底：段数恒守恒（=直译段数），通顺化尽量采纳；润色对不上的个别段回退该段直译。
         if not polished:
             print("（语法适配遍无输出，保留直译稿）", file=sys.stderr)
         else:
-            out, fb = _merge_polished(draft, polished)
-            tag = "全段采纳" if fb == 0 else f"{fb} 段对不上·已回退该段直译"
+            out, fb, merge_notes = _merge_polished(draft, polished)
+            tag = "全段采纳" if fb == 0 else f"{fb} 段回退直译"
             print(f"（语法适配遍：{_bo_line_count(draft)} 段·{tag}）", file=sys.stderr)
+            for n in merge_notes:
+                print(f"  · {n}", file=sys.stderr)
             if fb and args.out:                       # 存润色原稿，供诊断对不上的原因
                 raw_p = args.out.with_name(args.out.stem + "_润色原稿" + args.out.suffix)
                 raw_p.write_text(polished + "\n", encoding="utf-8")
@@ -455,9 +591,23 @@ def main():
 
     out = _fullwidth_cn(out)          # 译文定稿一律中文全角标点（用户裁定·恒常）
     draft = _fullwidth_cn(draft)
+    if USAGE:
+        tot_in = sum(u["in"] for u in USAGE); tot_out = sum(u["out"] for u in USAGE)
+        print(f"（本次合计：{len(USAGE)} 次调用·输入 {tot_in:,} token·输出 {tot_out:,}·"
+              f"${sum(u['usd'] for u in USAGE):.3f}）", file=sys.stderr)
+    issues = qa_check(out)
+    if issues:
+        print(f"⚠ 质检：{len(issues)} 处待核（强制术语未落地/疑漏译）", file=sys.stderr)
+    else:
+        print("（质检：强制术语全部落地，无疑漏译段）", file=sys.stderr)
     if args.out:
         args.out.write_text(out + "\n", encoding="utf-8")
         print(f"译文已写入 {args.out}")
+        qa_p = args.out.with_name(args.out.stem + "_质检" + args.out.suffix)
+        qa_p.write_text("# 质检报告（自动·只报告不改稿）\n\n" +
+                        ("\n".join(f"- {x}" for x in issues) if issues else "无待核项。") + "\n",
+                        encoding="utf-8")
+        print(f"（质检报告 {qa_p}）")
         # 润色时把纯直译稿一并另存，供日后「机器直译↔用户校正版」diff 提炼文风规律。
         if args.polish and out is not draft:
             draft_path = args.out.with_name(args.out.stem + "_直译" + args.out.suffix)
