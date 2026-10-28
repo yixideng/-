@@ -252,30 +252,91 @@ def load_glossary():
     global _glossary_cache
     if _glossary_cache is None:
         # 依当前项目按序读取术语文件：共享基础在前、项目覆盖层在后；
-        # 覆盖层同一藏文词直接盖过基础层（项目专用译名优先），故新项目既复用
+        # 覆盖层出现的藏文词，整组替换基础层同词条目（项目专用译名优先），故新项目既复用
         # 积累术语，又能就本项目语境改写而不影响共享库。
-        merged = {}  # bo -> (zh, freq, human, multi)
+        groups = {}   # bo -> [GlossEntry…]（同层内按文件行序，越后越新）
+        seq = 0
         for gf in _cfg()["glossary"]:
             if not gf.exists():
                 continue
             is_overlay = gf != SHARED_GLOSSARY
+            fresh = set()
             for i, line in enumerate(gf.open(encoding="utf-8")):
                 if i == 0:
                     continue
                 parts = line.rstrip("\n").split("\t")
-                if len(parts) >= 3:
-                    bo, zh, freq = parts[0], parts[1], int(parts[2])
-                    src = parts[3] if len(parts) >= 4 else ""
-                    human = "人工校正" in src
-                    multi = "多义" in src
-                    prev = merged.get(bo)
-                    # 覆盖层无条件盖过基础层；同层内按 多义>人工校正>频次 择优
-                    if is_overlay or prev is None or (multi and not prev[3]) \
-                            or (multi == prev[3] and human and not prev[2]) \
-                            or (multi == prev[3] and human == prev[2] and freq > prev[1]):
-                        merged[bo] = (zh, freq, human, multi)
-        _glossary_cache = {k: (v[0], v[1], v[3]) for k, v in merged.items()}
+                if len(parts) < 3:
+                    continue
+                try:
+                    freq = int(parts[2])
+                except ValueError:
+                    continue
+                bo, zh = parts[0], parts[1]
+                src = parts[3] if len(parts) >= 4 else ""
+                if is_overlay and bo not in fresh:      # 覆盖层：首次出现即清空基础层同词
+                    groups[bo] = []
+                    fresh.add(bo)
+                seq += 1
+                groups.setdefault(bo, []).append(_gloss_entry(zh, freq, src, seq))
+        resolved = ((bo, _resolve_gloss(es)) for bo, es in groups.items() if es)
+        _glossary_cache = {bo: v for bo, v in resolved if v is not None}
     return _glossary_cache
+
+
+# ---------- 术语择优（用户裁定·恒常）----------
+# 权威分层：用户裁定/校订本(3) ＞ 人工校正(2) ＞ 自动抽取(1)；「参考」标记(0)＝降级不强制。
+# 曾只认「人工校正」字样，致「用户裁定」「校订本(用户认可)」条目被频次高的自动条目静默盖掉
+# （45 条失效：等无间缘→无间缘、承许→欲、意趣→深密、归摄→集会…），今改分层择优。
+_CTX_MARK = ("语境", "按境")
+_CORE_CUT = re.compile(r"[（(〔\[;；·｜]")
+
+
+class GlossEntry(tuple):
+    __slots__ = ()
+    zh = property(lambda s: s[0]); freq = property(lambda s: s[1])
+    tier = property(lambda s: s[2]); multi = property(lambda s: s[3])
+    ctx = property(lambda s: s[4]); seq = property(lambda s: s[5])
+    core = property(lambda s: s[6])
+
+
+def _gloss_entry(zh: str, freq: int, src: str, seq: int) -> GlossEntry:
+    if "参考" in src:
+        tier = 0
+    elif "用户" in src or "校订本" in src:
+        tier = 3
+    elif "人工校正" in src:
+        tier = 2
+    else:
+        tier = 1
+    core = _CORE_CUT.split(zh, 1)[0].strip() or zh.strip()
+    return GlossEntry((zh, freq, tier, "多义" in src, any(m in zh for m in _CTX_MARK), seq, core))
+
+
+def _resolve_gloss(es):
+    """同一藏文词头的多条 → (汉译, 频次, 是否多义)。见上方分层规则。"""
+    rank = lambda e: (e.tier, e.freq, e.seq)
+    best = max(es, key=rank)
+    freq = max(e.freq for e in es)
+    cores = {e.core for e in es}
+    if best.multi:                                   # 旧式显式「多义」条目，自带义项清单
+        return best.zh, freq, True
+    if best.tier == 0:                               # 只剩降级「参考」条目（校正命中率低）→不进资料包，
+        return None                                  # 交由词典＋译例供义，免低命中译名继续误导
+    if len(cores) == 1:                              # 只有一个核心译名→强制
+        return best.zh, freq, False
+    if best.tier == 1:                               # 纯自动条目间冲突→沿旧规取频次最高强制
+        return best.zh, freq, False
+    top = [e for e in es if e.tier == best.tier]
+    if len({e.core for e in top}) == 1 and not any(e.ctx for e in top):
+        return best.zh, freq, False                  # 最高层单一定名→取代低层（替换型纠正）
+    # 多义：列出全部核心义项，高层在前；每义附判别线索（截短）
+    seen, senses = set(), []
+    for e in sorted(es, key=rank, reverse=True):
+        if e.core in seen or e.tier == 0:
+            continue
+        seen.add(e.core)
+        senses.append(e.zh if len(e.zh) <= 90 else e.zh[:88] + "…")
+    return "｜".join(senses), freq, True
 
 
 def scan_glossary(bo_text: str, max_len=8):
