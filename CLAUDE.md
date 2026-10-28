@@ -7,8 +7,8 @@
 ## 这个 agent 是什么
 
 它不是一个常驻服务，而是「脚本 + 数据」。翻译时运行 `agent/translator.py`，
-它会自动：分段 → 查两本词典 → 套用术语表（强制统一译名）→ 检索相似历史译例
-→ **注入笔记层（法义纲要 + 句法通则）** → 交给 Claude 出译文。详见 `PLAN.md` 与 `pipeline/README.md`。
+它会自动：分段 → 查四部词典（按优先级）→ 套用术语表（分层择优·强制或多义提示）→ 检索相似历史译例
+→ **注入笔记层（法义通则＋相关纪要 / 句法 / 文风）** → 交给 Claude 出直译 → 润色 → 全角规范化。详见 `PLAN.md` 与 `pipeline/README.md`。
 
 ## 查词优先级（用户裁定·恒常·防词义飘移）
 
@@ -56,134 +56,25 @@
 `notes/` 两文件都进 Git、以用户为权威；由 `translator.py` 每次翻译恒常注入（不靠相似度），
 故文法/义理类校正（"换了词也照样成立"的规律）也能扩散——这类校正**不要**只塞进术语表或译例。
 
-## 会话开始时：先确认索引在不在（容器是临时的）
+## 会话开始时：一键重建（容器是临时的）
 
-词典库/翻译记忆是**可再生的大文件**，不进 Git，容器重置后会消失。开工前先检查：
-
-```bash
-ls -lh data/processed/dict.sqlite data/processed/gexi.sqlite \
-       data/processed/yogacarabhumi_glossary.sqlite data/processed/ratnagotra_glossary.sqlite 2>/dev/null
-```
-
-**若不存在，先重建**（原始素材在本仓库的 GitHub Release，持久保存）：
+词典库/翻译记忆是**可再生的大文件**，不进 Git，容器重置后会消失。开工先跑：
 
 ```bash
-# 1. 藏汉大辞典
-curl -sSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
-  "https://api.github.com/repos/yixideng/-/releases/assets/488012632" \
-  -o data/raw/dictionaries/zhdcd_full.txt
-python3 pipeline/parse_dict.py data/raw/dictionaries/zhdcd_full.txt --out data/processed/dict.jsonl
-python3 pipeline/build_index.py data/processed/dict.jsonl --out data/processed/dict.sqlite
-
-# 2. 格西曲扎藏文词典
-curl -sSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
-  "https://api.github.com/repos/yixideng/-/releases/assets/488022264" \
-  -o data/raw/dictionaries/gexi_full.txt
-python3 pipeline/parse_gexi.py data/raw/dictionaries/gexi_full.txt --out data/processed/gexi.jsonl
-python3 pipeline/build_index.py data/processed/gexi.jsonl --out data/processed/gexi.sqlite
-
-# 3. 瑜伽师地论词汇表（③）
-curl -sSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
-  "https://api.github.com/repos/yixideng/-/releases/assets/681735943" \
-  -o data/raw/dictionaries/yogacarabhumi_glossary_mdx.txt
-python3 pipeline/parse_mdx_glossary.py data/raw/dictionaries/yogacarabhumi_glossary_mdx.txt --source 瑜伽师地论词汇表 --out data/processed/yogacarabhumi_glossary.jsonl
-python3 pipeline/build_index.py data/processed/yogacarabhumi_glossary.jsonl --out data/processed/yogacarabhumi_glossary.sqlite
-
-# 4. 宝性论大疏词汇表（④）
-curl -sSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
-  "https://api.github.com/repos/yixideng/-/releases/assets/681709400" \
-  -o data/raw/dictionaries/ratnagotra_glossary_mdx.txt
-python3 pipeline/parse_mdx_glossary.py data/raw/dictionaries/ratnagotra_glossary_mdx.txt --source 宝性论大疏词汇表 --out data/processed/ratnagotra_glossary.jsonl
-python3 pipeline/build_index.py data/processed/ratnagotra_glossary.jsonl --out data/processed/ratnagotra_glossary.sqlite
-
-# 5. 译例（翻译记忆）
-curl -sSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
-  "https://api.github.com/repos/yixideng/-/releases/assets/488042512" \
-  -o data/raw/parallel/sample1_baoxinglun.txt
-curl -sSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
-  "https://api.github.com/repos/yixideng/-/releases/assets/488043677" \
-  -o data/raw/parallel/sample2_zhongguan.txt
-python3 pipeline/align.py data/raw/parallel/sample1_baoxinglun.txt --source "宝性论大疏" --out data/processed/tm_baoxinglun.jsonl
-python3 pipeline/align.py data/raw/parallel/sample2_zhongguan.txt --source "极广胜乘中观决定" --out data/processed/tm_zhongguan.jsonl
-# 用户校订·文风范本（对照源在 review/，进 Git）
-python3 pipeline/align.py review/gzhanstong_reviewed_parallel.txt --source "他空中观校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_reviewed.jsonl
-python3 pipeline/align.py review/gzhanstong_2.0_parallel.txt --source "他空中观2.0论体校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_2.jsonl
-python3 pipeline/align.py review/gzhanstong_2.2_parallel.txt --source "他空中观2.2广说校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_22.jsonl
-python3 pipeline/align.py review/gzhanstong_2.3_异门_parallel.txt --source "他空中观2.3异门校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_23.jsonl
-python3 pipeline/align.py review/gzhanstong_2.4_蕴界处_parallel.txt --source "他空中观品二蕴界处校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_24.jsonl
-python3 pipeline/align.py review/gzhanstong_2.5_行蕴_parallel.txt --source "他空中观品二行蕴校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_25.jsonl
-python3 pipeline/align.py review/gzhanstong_2.6_性相法_parallel.txt --source "他空中观品二性相法校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_26.jsonl
-python3 pipeline/align.py review/gzhanstong_2.7_假立法续_parallel.txt --source "他空中观品二假立法续校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_27.jsonl
-python3 pipeline/align.py review/gzhanstong_2.8_无实法道_parallel.txt --source "他空中观品二无实法与道校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_28.jsonl
-python3 pipeline/align.py review/gzhanstong_2.9_五乘无为果_parallel.txt --source "他空中观品二五乘无为果校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_29.jsonl
-python3 pipeline/align.py review/gzhanstong_2.10_五基_parallel.txt --source "他空中观品二五基校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_210.jsonl
-python3 pipeline/align.py review/gzhanstong_2.11_四谛_parallel.txt --source "他空中观品二四谛校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_211.jsonl
-python3 pipeline/align.py review/gzhanstong_2.12_品二末_parallel.txt --source "他空中观品二末段校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_212.jsonl
-python3 pipeline/align.py review/gzhanstong_3.2_常义周遍义_parallel.txt --source "他空中观品三常义周遍义校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_32.jsonl
-python3 pipeline/align.py review/gzhanstong_3.3_觉义一切相_parallel.txt --source "他空中观品三觉义一切相校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_33.jsonl
-python3 pipeline/align.py review/gzhanstong_3.4_一切相离戏不杂_parallel.txt --source "他空中观品三一切相离戏不杂校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_34.jsonl
-python3 pipeline/align.py review/gzhanstong_3.5_双运种界龙树会通九相_parallel.txt --source "他空中观品三双运种界龙树会通九相校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_35.jsonl
-python3 pipeline/align.py review/gzhanstong_3.6_断疑常义周遍自证_parallel.txt --source "他空中观品三断疑常义周遍自证校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_36.jsonl
-python3 pipeline/align.py review/gzhanstong_3.7_破立缘起双运种界现相_parallel.txt --source "他空中观品三破立缘起双运种界现相校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_37.jsonl
-python3 pipeline/align.py review/gzhanstong_3.8_法界离时种界遍义破三错解_parallel.txt --source "他空中观品三法界离时种界遍义破三错解校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_38.jsonl
-python3 pipeline/align.py review/gzhanstong_3.9_阿赖耶智涅槃轮回基果非新生_parallel.txt --source "他空中观品三阿赖耶智涅槃轮回基果非新生校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_39.jsonl
-python3 pipeline/align.py review/gzhanstong_4.1_真世俗唯识八识聚三十颂略标_parallel.txt --source "他空中观品四真世俗唯识八识聚三十颂略标校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_41.jsonl
-python3 pipeline/align.py review/gzhanstong_4.2_三识体性异熟种子阿赖耶三相_parallel.txt --source "他空中观品四三识体性异熟种子阿赖耶三相校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_42.jsonl
-python3 pipeline/align.py review/gzhanstong_4.3_心意识三名五遍行无覆无记转依_parallel.txt --source "他空中观品四心意识三名五遍行无覆无记转依校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_43.jsonl
-python3 pipeline/align.py review/gzhanstong_4.4_释末那六转识八识俱起意识界限_parallel.txt --source "他空中观品四释末那六转识八识俱起意识界限校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_44.jsonl
-python3 pipeline/align.py review/gzhanstong_4.5_因果次第教理成立阿赖耶引经_parallel.txt --source "他空中观品四因果次第教理成立阿赖耶引经校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_45.jsonl
-python3 pipeline/align.py review/gzhanstong_4.6_理证成立阿赖耶衣罩喻还灭心性清净引密严经_parallel.txt --source "他空中观品四理证成立阿赖耶衣罩喻还灭心性清净引密严经校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_46.jsonl
-python3 pipeline/align.py review/gzhanstong_4.7_外境不成乳酪功德喻十八部异名龙树菩提心释成立阿赖耶_parallel.txt --source "他空中观品四外境不成乳酪功德喻十八部异名龙树菩提心释成立阿赖耶校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_47.jsonl
-python3 pipeline/align.py review/gzhanstong_4.8_理证成立阿赖耶四无心位有心破命根说_parallel.txt --source "他空中观品四理证成立阿赖耶四无心位有心破命根说校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_48.jsonl
-python3 pipeline/align.py review/gzhanstong_4.9_染净因果依阿赖耶破外道破一切种顿现_parallel.txt --source "他空中观品四染净因果依阿赖耶破外道破一切种顿现校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_49.jsonl
-python3 pipeline/align.py review/gzhanstong_4.10_习气新旧安置因果俱时破法称成立染污意理证_parallel.txt --source "他空中观品四习气新旧安置因果俱时破法称成立染污意理证校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_410.jsonl
-python3 pipeline/align.py review/gzhanstong_4.11_染污意教证成立八识习气异名六种子等流异熟_parallel.txt --source "他空中观品四染污意教证成立八识习气异名六种子等流异熟校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_411.jsonl
-python3 pipeline/align.py review/gzhanstong_4.12_阿赖耶异名门轮回转依因果作业六缘破一识_parallel.txt --source "他空中观品四阿赖耶异名门轮回转依因果作业六缘破一识校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_412.jsonl
-python3 pipeline/align.py review/gzhanstong_4.13_非真实遍计识心所分工七识受用受想行轮回生灭唯识无境_parallel.txt --source "他空中观品四非真实遍计识心所分工七识受用受想行轮回生灭唯识无境校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_413.jsonl
-python3 pipeline/align.py review/gzhanstong_4.14_轮回还灭止观四所缘如理作意道破二取_parallel.txt --source "他空中观品四轮回还灭止观四所缘如理作意道破二取校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_414.jsonl
-python3 pipeline/align.py review/gzhanstong_4.15_义摄结颂八识成立品竟_parallel.txt --source "他空中观品四义摄结颂八识成立品竟校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_415.jsonl
-python3 pipeline/align.py review/gzhanstong_5.1_五法体性因相分类_parallel.txt --source "他空中观品五五法体性因相分类校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_51.jsonl
-python3 pipeline/align.py review/gzhanstong_5.2_名分别有无一异四谛二谛法义_parallel.txt --source "他空中观品五名分别有无一异四谛二谛法义校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_52.jsonl
-python3 pipeline/align.py review/gzhanstong_5.3_三性略示广说体性圆成实第一相_parallel.txt --source "他空中观品五三性略示广说体性圆成实第一相校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_53.jsonl
-python3 pipeline/align.py review/gzhanstong_5.4_圆成后二相三性摄三无自性龙树世亲教证遍计分类_parallel.txt --source "他空中观品五三性圆成后二相·三性摄·三无自性·龙树世亲教证·遍计分类校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_54.jsonl
-python3 pipeline/align.py review/gzhanstong_5.5_依他分类楞伽六依他圆成分类无著四种弥勒二种_parallel.txt --source "他空中观品五依他分类·楞伽六依他·圆成分类无著四种弥勒二种校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_55.jsonl
-python3 pipeline/align.py review/gzhanstong_5.6_三性一异抉择摄二依他遍计所依破净依他独存圆成二种_parallel.txt --source "他空中观品五三性一异抉择·摄二·破净依他独存·圆成二种校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_56.jsonl
-python3 pipeline/align.py review/gzhanstong_5.7_引申义十种散乱分别_parallel.txt --source "他空中观品五5.7引申义十种散乱分别校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_57.jsonl
-python3 pipeline/align.py review/gzhanstong_5.8_根本分别十种分别十一识唯识无外境_parallel.txt --source "他空中观品五5.8根本分别十种分别十一识唯识无外境校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_58.jsonl
-python3 pipeline/align.py review/gzhanstong_5.9_三性有无水月喻遍所相事烦恼道果三空性_parallel.txt --source "他空中观品五5.9三性有无水月喻遍所相事烦恼道果三空性校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_59.jsonl
-python3 pipeline/align.py review/gzhanstong_5.10_三空性般若五百颂经说有无密意三无自性引申缘起二分_parallel.txt --source "他空中观品五5.10三空性般若五百颂经说有无密意三无自性引申缘起二分校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_510.jsonl
-python3 pipeline/align.py review/gzhanstong_5.11_真实缘起阿赖耶缘起词义训诂缘起三分分别自性爱非爱_parallel.txt --source "他空中观品五5.11真实缘起阿赖耶缘起词义训诂缘起三分分别自性爱非爱校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_511.jsonl
-python3 pipeline/align.py review/gzhanstong_5.12_爱非爱缘起字义染净受用缘起触受四缘细无常声闻人无我阿罗汉转依缘起八分外内器世间_parallel.txt --source "他空中观品五5.12爱非爱缘起字义染净受用缘起触受四缘细无常声闻人无我阿罗汉转依缘起八分外内器世间校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_512.jsonl
-python3 pipeline/align.py review/gzhanstong_5.13a_四食养命可欲不可欲趣清净五道威力六神通八分总摄六染二净十二支四门分位二生三生摄颂_parallel.txt --source "他空中观品五5.13a四食养命可欲不可欲趣清净五道威力六神通八分总摄六染二净十二支四门分位二生三生摄颂校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_513a.jsonl
-python3 pipeline/align.py review/gzhanstong_5.13b_分位缘起长行二生三生引成四支惑业苦植种养种印藏混杂说辩破所引支种子位应成破_parallel.txt --source "他空中观品五5.13b分位缘起长行二生三生引成四支惑业苦植种养种印藏混杂说辩破所引支种子位应成破校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_513b.jsonl
-python3 pipeline/align.py review/gzhanstong_5.14_辩破一业二异熟三世二次因果遮三际愚一生圆满十二支刹那相属缘起_parallel.txt --source "他空中观品五5.14辩破一业二异熟三世二次因果遮三际愚一生圆满十二支刹那相属缘起校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_514.jsonl
-python3 pipeline/align.py review/gzhanstong_5.15_辨中边论十二支性相颂无明支三特征词源明觉具烦恼无明根本我痴辩破萨迦耶见行支福非福不动业_parallel.txt --source "他空中观品五5.15辨中边论十二支性相颂无明支三特征词源明觉具烦恼无明根本我痴辩破萨迦耶见行支福非福不动业校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_515.jsonl
-python3 pipeline/align.py review/gzhanstong_5.16_识支因果位名色四名蕴胎中五位六处触受十八意近行三爱四取有生老死_parallel.txt --source "他空中观品五5.16识支因果位名色四名蕴胎中五位六处触受十八意近行三爱四取有生老死校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_516.jsonl
-python3 pipeline/align.py review/gzhanstong_5.17_文义辨中边论十一门正智随顺行支识支因果二识摄十一支名色支同分身_parallel.txt --source "他空中观品五5.17文义辨中边论十一门正智随顺行支识支因果二识摄十一支名色支同分身校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_517.jsonl
-python3 pipeline/align.py review/gzhanstong_5.18_辨中边论十一门余支六处至老死世亲三生具例第二科摄三杂染二摄俱舍龙树颂_parallel.txt --source "他空中观品五5.18辨中边论十一门余支六处至老死世亲三生具例第二科摄三杂染二摄俱舍龙树颂校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_518.jsonl
-python3 pipeline/align.py review/gzhanstong_5.19_二摄因果杂染第三义项七杂染因辨中边论七因二生圆满安慧寿种子能引能成缘起具例_parallel.txt --source "他空中观品五5.19二摄因果杂染第三义项七杂染因辨中边论七因二生圆满安慧寿种子能引能成缘起具例校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_519.jsonl
-python3 pipeline/align.py review/gzhanstong_5.20_释世亲缘起经释三根颂能引缘起三分能成缘起三分七义配支老死过患安慧根颂受生爱取生新业真谛现见不积引业_parallel.txt --source "他空中观品五5.20释世亲缘起经释三根颂能引缘起三分能成缘起三分七义配支老死过患安慧根颂受生爱取生新业真谛现见不积引业校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_520.jsonl
-python3 pipeline/align.py review/gzhanstong_5.21_见谛界限断三结破世间道得不还离爱无生阿罗汉断三界爱缘起义摄三相缘起真实性无我真实刹那无常苦空无我破作者_parallel.txt --source "他空中观品五5.21见谛界限断三结破世间道得不还离爱无生阿罗汉断三界爱缘起义摄三相缘起真实性无我真实刹那无常苦空无我破作者校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_521.jsonl
-python3 pipeline/align.py review/gzhanstong_5.22_缘起真实性内真实五义项非造作忽尔破外境谛实内识现外境相业烦恼苦唯内识生破微尘聚粗物天眼梦喻破眼识四缘外境_parallel.txt --source "他空中观品五5.22缘起真实性内真实五义项非造作忽尔破外境谛实内识现外境相业烦恼苦唯内识生破微尘聚粗物天眼梦喻破眼识四缘外境校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_522.jsonl
-python3 pipeline/align.py review/gzhanstong_5.23_内真实第五科假立唯识总时唯心生住灭一识现三世无自性真实唯识如梦不灭所取无能取无离四边唯识无自性四重世俗谛位_parallel.txt --source "他空中观品五5.23内真实第五科假立唯识总时唯心生住灭一识现三世无自性真实唯识如梦不灭所取无能取无离四边唯识无自性四重世俗谛位校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_523.jsonl
-python3 pipeline/align.py review/gzhanstong_5.24_集论缘起甚深四不生破无著龙树缘起差别说胜义缘起自性光明本智离能生所立二缘起布达拉忆念喻缘起即空性人法二无我趣入名义经十二支根本颂_parallel.txt --source "他空中观品五5.24集论缘起甚深四不生破无著龙树缘起差别说胜义缘起自性光明本智离能生所立二缘起布达拉忆念喻缘起即空性人法二无我趣入名义经十二支根本颂校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_524.jsonl
-python3 pipeline/align.py review/gzhanstong_5.25_缘起引申因缘安立六因四缘五果十五种略标广说能作因俱有因同类相应遍行异熟因四缘五果异名相应因四义俱有因内外_parallel.txt --source "他空中观品五5.25缘起引申因缘安立六因四缘五果十五种略标广说能作因俱有因同类相应遍行异熟因四缘五果异名相应因四义俱有因内外校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_525.jsonl
-python3 pipeline/align.py review/gzhanstong_5.26_俱有因外四大种八九事微尘甘蔗喻遍行因烦恼生烦恼类地不定与同类因关系同类因相顺异熟因善恶生无记能作因破无力二十差别士用果_parallel.txt --source "他空中观品五5.26俱有因外四大种八九事微尘甘蔗喻遍行因烦恼生烦恼类地不定与同类因关系同类因相顺异熟因善恶生无记能作因破无力二十差别士用果校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_526.jsonl
-python3 pipeline/align.py review/gzhanstong_5.27_释四缘因缘五因摄近取因阿赖耶所缘缘增上缘四分等无间缘三说色法二缘识四缘_parallel.txt --source "他空中观品五5.27释四缘因缘五因摄近取因阿赖耶所缘缘增上缘四分等无间缘三说色法二缘识四缘校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_527.jsonl
-python3 pipeline/align.py review/gzhanstong_5.28_释五果离系果择灭胜义灭谛增上异熟士用等流果二因总摄无漏种子得生加行观待成立辨左右山喻只破遍计不破依他品五终_parallel.txt --source "他空中观品五5.28释五果离系果择灭胜义灭谛增上异熟士用等流果二因总摄无漏种子得生加行观待成立辨左右山喻只破遍计不破依他品五终校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_528.jsonl
-python3 pipeline/align.py review/gzhanstong_6.1_二无我品开篇人无我趣入四颠倒我执萨迦耶见染污慧无明常断二边细无常行苦_parallel.txt --source "他空中观品六6.1二无我品开篇人无我趣入四颠倒我执萨迦耶见染污慧无明常断二边细无常行苦校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_61.jsonl
-python3 pipeline/align.py review/gzhanstong_6.2_成立人无我正理前行成立有为无常刹那生灭多重理证_parallel.txt --source "他空中观品六6.2成立有为无常刹那生灭多重理证校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_62.jsonl
-python3 pipeline/align.py review/gzhanstong_6.3_成立内之诸行刹那十四种生.txt --source "他空中观品六6.3成立内之诸行刹那十四种生校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_63.jsonl
-python3 pipeline/align.py review/gzhanstong_6.4_外器世间诸行刹那引申义无实法无常空性非胜义.txt --source "他空中观品六6.4外器世间诸行刹那引申义无实法无常空性非胜义校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_64.jsonl
-python3 pipeline/align.py "review/gzhanstong_6.5_引申义考察生灭之义二灭有为实法无实法皆有为_parallel.txt" --source "他空中观品六6.5引申义考察生灭之义二灭有为实法无实法皆有为校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_65.jsonl
-python3 pipeline/align.py "review/gzhanstong_6.6_成立诸行为苦_parallel.txt" --source "他空中观品六6.6成立诸行为苦校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_66.jsonl
-python3 pipeline/align.py "review/gzhanstong_6.7_成立诸行空于作者破自在天_parallel.txt" --source "他空中观品六6.7成立诸行空于作者破自在天校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_67.jsonl
-python3 pipeline/align.py "review/gzhanstong_6.8_人无我正说须说理由我执萨迦耶见象喻三别三性所化三类四宗立宗_parallel.txt" --source "他空中观品六6.8人无我正说须说理由我执萨迦耶见象喻三别三性所化三类四宗立宗校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_68.jsonl
-python3 pipeline/align.py "review/gzhanstong_6.9_弥勒庄严经论文破我与作者三择破河流喻二因不悟行苦法性破作者真实品菩提分品立宗_parallel.txt" --source "他空中观品六6.9弥勒庄严经论文破我与作者三择破河流喻二因不悟行苦法性破作者真实品菩提分品立宗校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_69.jsonl
-python3 pipeline/align.py "review/gzhanstong_6.10_破补特伽罗实体有广释五科总破我蕴一异不可说犊子部火薪喻_parallel.txt" --source "他空中观品六6.10破补特伽罗实体有广释五科总破我蕴一异不可说犊子部火薪喻校订本(用户认可·文风范本)" --out data/processed/tm_gzhanstong_610.jsonl
+python3 pipeline/rebuild.py          # 缺什么补什么（已在的跳过），约 1~2 分钟
 ```
 
-术语表 `glossary/glossary.tsv` 与校正稿目录 `review/` **在 Git 里**，无需重建。
+它做三件事：① 四部字典从 GitHub Release 下载→解析→建库；② 两份底本样例译例；
+③ **自动扫描**全部用户校正版平行文（`review/gzhanstong_*.txt`、`projects/*/review/*_parallel.txt`）
+对齐为译例，并清除已无对应平行文的陈旧 tm。`--force` 全部重做；`--tm-only` 只重对齐译例。
+下载需环境变量 `GITHUB_TOKEN`（云端会话自带；本机须在 GitHub 账号 Settings→Developer settings 生成只读令牌）。
+
+Release 资产（脚本内已登记，`pipeline/rebuild.py` 的 `DICTS`/`SAMPLES`）：
+藏汉大辞典 488012632 · 格西曲扎 488022264 · 瑜伽师地论词汇表 681735943 · 宝性论大疏词汇表 681709400 ·
+样例 sample1 488042512 / sample2 488043677。新增字典：上传 Release 后在 `DICTS` 加一行即可。
+
+译例文件名由平行文名自动派生（`pipeline/tmlib.py`），`agent/tools.py` 按通配自动加载，**无需手工登记**；
+各段要点摘要存档于 `docs/tm_index.md`。术语表 `glossary/` 与校正稿 `review/` 在 Git 里，无需重建。
 
 ## 翻译一段藏文
 
@@ -214,13 +105,37 @@ python3 agent/translator.py --file 待译.txt --out 译文.md --no-polish   # �
 
 ## 校正回流（越用越准）
 
-人工校改后的稿子放 `review/`；术语层面的更正并入 `glossary/glossary.tsv`。
-这两处是核心人工资产，都在 Git 里，永久保存。
+**机械部分一条命令**（对齐入译例＋留存机器稿＋更新评测趋势）：
+
+```bash
+python3 pipeline/reflow.py review/gzhanstong_<段>_<题>_parallel.txt \
+    --draft data/raw/source_texts/译文_品X_<段>_<题>.md
+```
+
+其余为判断性工作（脚本会列清单）：术语入 `glossary/glossary.tsv`、本段纪要入 `notes/法义.md`、
+可泛化规律入 `notes/句法.md`/`notes/文风.md`、写 `review/*_校订本.md`；末了跑术语体检并提交。
+
+- **机器稿勿手改**：`译文.md` 是流水线原样输出，会话中的订正只进对话与校正版，**不改 `译文.md`**——
+  否则留存稿被污染，评测偏高（6.9 即此，表中标 *）。
+- **评测**：`python3 pipeline/eval_trend.py` → `review/_评测/趋势.md`（机器稿↔校正版逐段相似度·术语采用率）。
+  基线：品五末至品六 11 段平均相似度 0.57（用户约改 43% 字）。改流水线/换模型后以此对比。
+- **术语体检**：`python3 pipeline/audit_glossary.py`（报告）/`--apply`（落盘）——以全部校正版实测强制术语命中率，
+  低命中自动条目降「参考」（不进资料包）、中命中改「多义·非强制」；**用户裁定永不降级**。
+
+**术语择优（`agent/tools.py` `load_glossary`·恒常）**：同一藏文词多条时按权威分层——
+用户裁定/校订本 ＞ 人工校正 ＞ 自动抽取 ＞ 参考；只一核心译名→强制；最高层单一定名且无「语境」标注→强制（替换型纠正）；
+否则列入「多义词」栏全部义项、不强制。故**新增裁定的出处列须写「用户裁定」或「校订本」字样**，
+多义按语境分者在汉译列注明「按语境」。
+
+
+人工校改后的稿子放 `review/`，术语更正并入 `glossary/glossary.tsv`——核心人工资产，都在 Git 里，永久保存。
 
 **回流时识别术语的通则（用户裁定·恒常）：对比校正版时，凡定稿中带「」引号标出的字词，一般都是重要专业术语（固定词组/专名/教理术语）**——务必逐一核对 `glossary/glossary.tsv`：**词库无则必收**；**已有但译名不一或未命中**（如带格助词/前缀、动词变位致精确匹配失败）则**补词干形/前缀形条目并统一译名**。例：`ཉིང་མཚམས་སྦྱོར`（结生相续，固定词组）——词库原有 `སྦྱོར་བ` 完整形却因待译作 `མངལ་དུ་ཉིང་མཚམས་སྦྱོར་ཏེ`（前缀+变位）未命中而散译作「入母胎结生」，遂补词干形 `ཉིང་མཚམས་སྦྱོར` 与前缀形 `མངལ་དུ་ཉིང་མཚམས་སྦྱོར` 并统一定名。
 
 ## 现状与待办
 
-- ✅ 两本词典入库、术语表 v0（1054 条）、译例对齐、翻译流水线跑通
-- ⬜ 审校稿导出与回流脚本；评测基线
+- ✅ 四部字典入库（含查词优先级）、术语表、译例对齐、翻译流水线（直译→润色）跑通
+- ✅ 一键重建 `rebuild.py`、一键回流 `reflow.py`、评测基线 `eval_trend.py`、术语体检 `audit_glossary.py`
+- ✅ 法义按需注入（通则全量·纪要取相关）、术语择优分层、译文全角标点后处理
+- ⬜ 用评测基线比较新模型（流水线内层仍用 opus-4-8）
 - ⬜（可选）加藏文/汉文大藏经，做「暗引」比对与玄奘/鸠摩罗什对应译文
