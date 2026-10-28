@@ -78,7 +78,7 @@ def main():
     args = ap.parse_args()
 
     g, stat = audit()
-    rows = [l.rstrip("\n").split("\t") for l in GLOSSARY.open(encoding="utf-8")]
+    rows = [l.split("\t") for l in GLOSSARY.read_text(encoding="utf-8").splitlines()]
     user_bo = {r[0] for r in rows[1:] if len(r) > 3 and ("用户" in r[3] or "校订本" in r[3])}
     demote = []
     for bo, (hit, n) in stat.items():

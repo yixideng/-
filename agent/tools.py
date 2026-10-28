@@ -188,7 +188,7 @@ def load_glossary():
                 continue
             is_overlay = gf != SHARED_GLOSSARY
             fresh = set()
-            for i, line in enumerate(gf.open(encoding="utf-8")):
+            for i, line in enumerate(gf.read_text(encoding="utf-8").splitlines()):
                 if i == 0:
                     continue
                 parts = line.rstrip("\n").split("\t")
