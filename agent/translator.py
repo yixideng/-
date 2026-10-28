@@ -103,6 +103,38 @@ def split_segments(text: str, max_shad=16):
     return segs
 
 
+# 「法义.md」逐段纪要标题形如「## 5.22 …」「## 品六 6.10 …」；其余 ## 节为通则。
+_FAYI_JY = re.compile(r"## (品[一二三四五六七八九十]+\s*)?\d+\.\d+")
+
+
+def select_fayi(body: str, src: str, recent: int = 3, related: int = 3) -> str:
+    """法义按需注入：通则全量；逐段纪要只取「最近 recent 节（行文连续）＋与待译最相关
+    related 节」。相关度＝待译的藏文实词二连音节 ＋ 命中术语之汉译核心词，在纪要中的重合数。
+    纪要随翻译逐段增长（品六时已 27 节·3.6 万字），全量注入会稀释规则、拖长资料包。"""
+    secs = re.split(r"(?m)^(?=## )", body)
+    general = [s for s in secs if not _FAYI_JY.match(s)]
+    jy = [(i, s) for i, s in enumerate(secs) if _FAYI_JY.match(s)]
+    if len(jy) <= recent + related:
+        return body
+    syls = [x for x in tools.syllables(src) if x not in PARTICLE_SYLS]
+    bigrams = {f"{a}་{b}" for a, b in zip(syls, syls[1:])}
+    terms = set()
+    for _bo, zh, _f, _m in tools.scan_glossary(src):
+        for part in zh.split("｜"):
+            core = tools._CORE_CUT.split(part, 1)[0].strip()
+            if len(core) >= 2:
+                terms.add(core)
+    keep = {i for i, _ in jy[-recent:]}
+    # 得分按 √篇幅归一，免长节因字多而恒被选中（长节偏置）
+    scored = sorted((((sum(b in s for b in bigrams) + 2 * sum(t in s for t in terms))
+                      / len(s) ** 0.5, i) for i, s in jy if i not in keep), reverse=True)
+    keep |= {i for sc, i in scored[:related] if sc > 0}
+    picked = [s for i, s in jy if i in keep]
+    note = (f"\n> 〔逐段纪要按需节选：最近 {recent} 节＋相关 {related} 节，共 {len(picked)}/{len(jy)} 节；"
+            "全文见 notes/法义.md〕\n\n")
+    return "".join(general) + note + "".join(picked)
+
+
 def build_packet(text: str) -> str:
     segs = split_segments(text)
     lines = []
@@ -110,7 +142,10 @@ def build_packet(text: str) -> str:
     # 笔记层：法义纲要 + 句法通则（恒常注入，先于原文，供全篇遵循）——按当前项目取
     for nf in tools.project_notes():
         if nf.exists():
-            lines.append("\n---\n" + nf.read_text(encoding="utf-8"))
+            body = nf.read_text(encoding="utf-8")
+            if nf.name == "法义.md":           # 通则全量；逐段纪要按需节选（防提示膨胀稀释规则）
+                body = select_fayi(body, text)
+            lines.append("\n---\n" + body)
     lines.append("\n---\n## 待译原文（共 %d 段）\n" % len(segs))
     for i, s in enumerate(segs, 1):
         lines.append(f"[段{i}] {s}")
