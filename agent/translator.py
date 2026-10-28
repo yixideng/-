@@ -313,26 +313,68 @@ def _norm_bo(block: str) -> str:
     return ""
 
 
+def _bo_pairs(body: str):
+    """逐行切对照组（不依赖空行）：每个『纯藏文行』起一组，其后非藏文行（汉译）归入该组。
+    返回 [(藏文骨架key, 组原文)]。润色稿常漏段间空行而粘成一块，按空行切会整篇对不上。"""
+    def is_bo_line(l):
+        return any(0x0F00 <= ord(c) <= 0x0FFF for c in l) and \
+            not any(0x4E00 <= ord(c) <= 0x9FFF for c in l)
+    pairs, cur = [], None
+    for ln in body.splitlines():
+        if is_bo_line(ln):
+            if cur:
+                pairs.append(cur)
+            cur = [_norm_bo(ln), [ln]]
+        elif cur is not None:
+            cur[1].append(ln)
+    if cur:
+        pairs.append(cur)
+    return [(k, "\n".join(lines).strip()) for k, lines in pairs]
+
+
 def _merge_polished(draft: str, polished: str):
-    """段级对齐兜底：以直译稿段序为准，逐段取润色稿中『藏文行相同』之段之汉译；
-    润色稿缺失/改动藏文行而对不上的个别段，回退该段直译。段数恒等于直译稿，
-    免得一处漂移就整篇弃用润色。返回 (合并稿, 回退段数)。"""
+    """段级对齐兜底：以直译稿段序为准，逐段取润色稿中对应段之汉译，对不上的个别段回退直译。
+    三级匹配（曾因只认『藏文骨架全等＋空行切段』，6.10 润色 13 段全数回退）：
+      ① 骨架全等；② 骨架近似（≥0.85，偏向保持顺序）；③ 两稿段数相同时按位置（骨架≥0.5）。
+    润色段若无汉译则视为对不上。返回 (合并稿, 回退段数)。"""
+    from difflib import SequenceMatcher
     d_body, tail = _split_tail(draft)
     p_body, _ = _split_tail(polished)
-    d_blocks = [b for b in re.split(r"\n\s*\n", d_body.strip()) if b.strip()]
-    p_blocks = [b for b in re.split(r"\n\s*\n", p_body.strip()) if b.strip()]
-    p_map = {}
-    for b in p_blocks:
-        k = _norm_bo(b)
-        if k and k not in p_map:
-            p_map[k] = b
-    merged, fallback = [], 0
-    for b in d_blocks:
-        hit = p_map.get(_norm_bo(b))
-        if hit:
-            merged.append(hit)
+    d_pairs, p_pairs = _bo_pairs(d_body), _bo_pairs(p_body)
+    has_zh = lambda t: any(0x4E00 <= ord(c) <= 0x9FFF for c in t)
+    p_pairs = [(k, t) for k, t in p_pairs if has_zh(t)]
+    exact = {}
+    for j, (k, _) in enumerate(p_pairs):
+        exact.setdefault(k, j)
+    same_len = len(p_pairs) == len(d_pairs)
+    used, merged, fallback, pos = set(), [], 0, 0
+    for i, (k, txt) in enumerate(d_pairs):
+        j = exact.get(k)
+        if j is None or j in used:
+            j, best = None, 0.0
+            for jj, (pk, _) in enumerate(p_pairs):
+                if jj in used:
+                    continue
+                sm = SequenceMatcher(None, k, pk)
+                if sm.real_quick_ratio() < 0.85:
+                    continue
+                r = sm.ratio() + (0.02 if jj >= pos else 0.0)
+                if r > best:
+                    best, j = r, jj
+            if best < 0.85:
+                j = None
+                if same_len and i not in used and \
+                        SequenceMatcher(None, k, p_pairs[i][0]).ratio() >= 0.5:
+                    j = i
+        if j is not None:
+            used.add(j)
+            pos = j + 1
+            # 藏文行一律取直译稿原文（润色只许改汉译），汉译取润色稿
+            d_bo = txt.splitlines()[0]
+            p_zh = "\n".join(p_pairs[j][1].splitlines()[1:]).strip()
+            merged.append(d_bo + "\n" + p_zh)
         else:
-            merged.append(b)
+            merged.append(txt)
             fallback += 1
     out = "\n\n".join(merged)
     if tail:
@@ -406,6 +448,10 @@ def main():
             out, fb = _merge_polished(draft, polished)
             tag = "全段采纳" if fb == 0 else f"{fb} 段对不上·已回退该段直译"
             print(f"（语法适配遍：{_bo_line_count(draft)} 段·{tag}）", file=sys.stderr)
+            if fb and args.out:                       # 存润色原稿，供诊断对不上的原因
+                raw_p = args.out.with_name(args.out.stem + "_润色原稿" + args.out.suffix)
+                raw_p.write_text(polished + "\n", encoding="utf-8")
+                print(f"（润色原稿另存 {raw_p}，供诊断）", file=sys.stderr)
 
     out = _fullwidth_cn(out)          # 译文定稿一律中文全角标点（用户裁定·恒常）
     draft = _fullwidth_cn(draft)
