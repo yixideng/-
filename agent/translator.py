@@ -104,6 +104,77 @@ def split_segments(text: str, max_shad=16):
     return segs
 
 
+# 笔记节级元数据（写在该节标题下的 HTML 注释里，渲染不可见）：
+#   <!-- 触发：A|B|C -->        专项规则：待译藏文含任一触发串才注入；**无此标注＝通则，恒常注入**（拿不准即常驻，最坏等于全量）
+#   <!-- 状态：观察 -->          由 diff 归纳、尚未经用户裁定：照常注入，标「观察中」
+#   <!-- 状态：废止｜取代：§N --> 已被取代：不注入（原文留档）；须写明取代者，audit_notes.py 校验
+_META = re.compile(r"(?m)^<!--\s*(触发|状态)[：:]\s*(.*?)\s*-->")   # 须独占行首（正文里举例的不算）
+NOTE_REPORT = []        # 本次各笔记文件的注入报告（打印＋写入质检报告，漏注入可见）
+
+
+def _sec_meta(sec: str) -> dict:
+    meta = {}
+    for k, v in _META.findall(sec):
+        meta[k] = v
+    return meta
+
+
+def _sec_label(sec: str) -> str:
+    """节的简称：§22 / §5.12（法义纪要「## 品五 5.12 …」亦取段号）/ 无编号者取标题前 8 字。"""
+    head = sec.splitlines()[0].lstrip("# ").strip()
+    m = re.match(r"§?\s*(\d+(?:\.\d+)?[ab]?)", head) or \
+        re.match(r"品[一二三四五六七八九十]+\s*(\d+\.\d+[ab]?)", head)
+    return ("§" + m.group(1)) if m else head[:8]
+
+
+def _norm_tsheg(s: str) -> str:
+    return s.replace("༌", "་")
+
+
+def trigger_hit(sec: str, src: str) -> bool:
+    trig = _sec_meta(sec).get("触发")
+    if not trig:
+        return True
+    s = _norm_tsheg(src)
+    return any(_norm_tsheg(t.strip()) in s for t in trig.split("|") if t.strip())
+
+
+def gate_sections(body: str, src: str, name: str = ""):
+    """笔记节级注入：通则（无触发标注）全量；专项（有触发标注）仅在待译原文含触发串时注入；
+    废止节不注入。返回 (注入正文, 报告行)。报告列出跳过的节，令「漏注入」可见、可追查。"""
+    secs = re.split(r"(?m)^(?=## )", body)
+    keep, fired, skipped, retired, watch = [], [], [], [], []
+    for sec in secs:
+        meta = _sec_meta(sec)
+        lab = _sec_label(sec) if sec.startswith("## ") else ""
+        status = meta.get("状态", "")
+        if status.startswith("废止"):
+            retired.append(lab)
+            continue
+        if "触发" in meta:
+            if not trigger_hit(sec, src):
+                skipped.append(lab)
+                continue
+            fired.append(lab)
+        if status.startswith("观察"):
+            watch.append(lab)
+            sec = re.sub(r"(?m)^(## .*)$", r"\1　〔观察中·未经用户裁定，可酌情〕", sec, count=1)
+        keep.append(sec)
+    n_always = sum(1 for s in secs if s.startswith("## ") and "触发" not in _sec_meta(s)
+                   and not _sec_meta(s).get("状态", "").startswith("废止"))
+    rep = f"{name}：常驻 {n_always} 节"
+    if fired or skipped:
+        rep += f"·专项触发 {len(fired)} 节" + (f"（{' '.join(fired)}）" if fired else "")
+        rep += f"·未触发从略 {len(skipped)} 节" + (f"（{' '.join(skipped)}）" if skipped else "")
+    if watch:
+        rep += f"·观察中 {len(watch)} 节"
+    if retired:
+        rep += f"·已废止不注入 {len(retired)} 节（{' '.join(retired)}）"
+    if skipped:
+        keep.append(f"\n> 〔专项规则按触发词注入：本段未触发而从略 {' '.join(skipped)}；全文见 notes/{name}〕\n")
+    return "".join(keep), rep
+
+
 # 「法义.md」逐段纪要标题形如「## 5.22 …」「## 品六 6.10 …」；其余 ## 节为通则。
 _FAYI_JY = re.compile(r"## (品[一二三四五六七八九十]+\s*)?\d+\.\d+")
 
@@ -176,13 +247,20 @@ def build_packet(text: str, missing=None) -> str:
     if missing:
         lines.append("\n> ⚠ **资料缺失**：" + "；".join(missing) +
                      "。本次词典/译例等可能为空——遇无据之词须在校勘中标明「无词典依据」，勿凭空定名。\n")
-    # 笔记层：法义纲要 + 句法通则（恒常注入，先于原文，供全篇遵循）——按当前项目取
+    # 笔记层：法义纲要 + 句法通则（先于原文，供全篇遵循）——按当前项目取。
+    # 通则恒常注入；专项按触发词注入；法义逐段纪要按相关度节选。注入/从略情况记入 NOTE_REPORT。
+    NOTE_REPORT.clear()
     for nf in tools.project_notes():
         if nf.exists():
-            body = nf.read_text(encoding="utf-8")
+            body, rep = gate_sections(nf.read_text(encoding="utf-8"), text, nf.name)
             if nf.name == "法义.md":           # 通则全量；逐段纪要按需节选（防提示膨胀稀释规则）
                 body = select_fayi(body, text)
+                m = re.search(r"共 (\d+/\d+) 节", body)
+                if m:
+                    rep += f"·逐段纪要节选 {m.group(1)}"
+            NOTE_REPORT.append(rep)
             lines.append("\n---\n" + body)
+    lines.insert(1, "\n> 〔笔记注入：" + "；".join(NOTE_REPORT) + "〕\n")
     lines.append("\n---\n## 待译原文（共 %d 段）\n" % len(segs))
     for i, s in enumerate(segs, 1):
         lines.append(f"[段{i}] {s}")
@@ -510,7 +588,7 @@ def build_polish_packet(draft: str, src_text: str) -> str:
     # 文风笔记按当前项目取（约定为笔记层最后一件 …/文风.md）
     wind = next((n for n in tools.project_notes() if n.name == "文风.md"), None)
     if wind and wind.exists():
-        lines.append("\n---\n" + wind.read_text(encoding="utf-8"))
+        lines.append("\n---\n" + gate_sections(wind.read_text(encoding="utf-8"), src_text, wind.name)[0])
     # 术语约束：让润色明确哪些译名必须保持不动
     glo = tools.scan_glossary(src_text)
     fixed = [g for g in glo if not g[3]]
@@ -548,6 +626,7 @@ def main():
 
     missing = preflight(args.allow_missing)
     packet = build_packet(text, missing)
+    print("（笔记注入：" + "；".join(NOTE_REPORT) + "）", file=sys.stderr)
     if args.packet:
         print(packet)
         return
@@ -605,7 +684,9 @@ def main():
         print(f"译文已写入 {args.out}")
         qa_p = args.out.with_name(args.out.stem + "_质检" + args.out.suffix)
         qa_p.write_text("# 质检报告（自动·只报告不改稿）\n\n" +
-                        ("\n".join(f"- {x}" for x in issues) if issues else "无待核项。") + "\n",
+                        ("\n".join(f"- {x}" for x in issues) if issues else "无待核项。") +
+                        "\n\n## 笔记注入（专项规则按触发词注入；如疑某条该用而未注入，查此）\n\n" +
+                        "\n".join(f"- {r}" for r in NOTE_REPORT) + "\n",
                         encoding="utf-8")
         print(f"（质检报告 {qa_p}）")
         # 润色时把纯直译稿一并另存，供日后「机器直译↔用户校正版」diff 提炼文风规律。

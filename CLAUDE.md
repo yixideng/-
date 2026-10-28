@@ -8,7 +8,7 @@
 
 它不是一个常驻服务，而是「脚本 + 数据」。翻译时运行 `agent/translator.py`，
 它会自动：分段 → 查四部词典（按优先级）→ 套用术语表（分层择优·强制或多义提示）→ 检索相似历史译例
-→ **注入笔记层（法义通则＋相关纪要 / 句法 / 文风）** → 交给 Claude 出直译 → 润色 → 全角规范化。详见 `PLAN.md` 与 `pipeline/README.md`。
+→ **注入笔记层（法义通则＋相关纪要 / 句法通则＋触发专项 / 文风）** → 交给 Claude 出直译 → 润色 → 全角规范化。详见 `PLAN.md` 与 `pipeline/README.md`。
 
 ## 查词优先级（用户裁定·恒常·防词义飘移）
 
@@ -53,8 +53,15 @@
 | **法义/教义**（宗见、破立归属、义理取向） | `notes/法义.md` | **恒常注入 prompt** |
 | **句法/文法**（结构解析通则） | `notes/句法.md` | **恒常注入 prompt** |
 
-`notes/` 两文件都进 Git、以用户为权威；由 `translator.py` 每次翻译恒常注入（不靠相似度），
+`notes/` 两文件都进 Git、以用户为权威；由 `translator.py` 每次翻译注入（不靠相似度），
 故文法/义理类校正（"换了词也照样成立"的规律）也能扩散——这类校正**不要**只塞进术语表或译例。
+
+**笔记分层注入（`translator.py` `gate_sections`·失败可见）**：笔记节分两类——**通则**（无标注，恒常注入）
+与**专项**（标题下 `<!-- 触发：A|B -->`，待译藏文含任一触发串才注入）。**拿不准一律作通则**，最坏等于全量注入。
+法义逐段纪要另按相关度节选。资料包首部、终端与 `<译文>_质检.md` 都列出「常驻/触发/从略」各节，漏注入可查。
+节的生命周期：用户裁定者直接生效（不需「两次印证」）；仅由 diff 归纳、用户未表态者标 `<!-- 状态：观察 -->`；
+被取代者标 `<!-- 状态：废止｜取代：§N -->`（不注入，原文留档）。`python3 pipeline/audit_notes.py` 体检：
+触发词在其来源段/自身例句上是否命中（漏触发）、是否从不触发（死触发）、废止有无取代者，并列疑重复条目。
 
 ## 会话开始时：一键重建（容器是临时的）
 
@@ -149,8 +156,9 @@ python3 pipeline/reflow.py review/gzhanstong_<段>_<题>_parallel.txt \
 ## 改动流水线后（自检）
 
 ```bash
-python3 -m unittest discover tests      # 回归测试 33 项：术语择优·失败发声·词典选词·IDF检索·质检·润色对齐·法义节选…
+python3 -m unittest discover tests      # 回归测试 38 项：术语择优·失败发声·词典选词·IDF检索·质检·润色对齐·法义节选…
 python3 pipeline/audit_glossary.py      # 术语体检（强制术语在校正版上的命中率）
+python3 pipeline/audit_notes.py         # 笔记体检（专项规则触发词：漏触发/死触发/废止无取代）
 python3 pipeline/audit_glossary.py --conflicts   # 一词多译词头如何取舍（透明报告）
 python3 pipeline/eval_trend.py --show   # 与评测基线对比
 ```

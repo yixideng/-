@@ -63,8 +63,12 @@ def main():
     print("   - 术语：校正版「」所标术语逐一核 glossary/glossary.tsv（无则收·有而不一则补词干/前缀形）")
     print("   - 法义：notes/法义.md 追加本段纪要（自动按需注入，不必顾虑篇幅）")
     print("   - 句法/文风：diff 机器稿↔校正版，可泛化之规律入 notes/句法.md / notes/文风.md")
+    print("     · 新节默认＝通则（恒常注入）；只管特定词/结构的才在标题下加 <!-- 触发：A|B -->")
+    print("     · 用户明确裁定者直接生效；仅由 diff 归纳、用户未表态者加 <!-- 状态：观察 -->")
+    print("     · 新规取代旧节：旧节加 <!-- 状态：废止｜取代：§N -->（原文留档、不再注入）")
     print(f"   - 校订本：review/{prefix}_{sec}_…_校订本.md（根颂·汉传引文·前译↔校正差异）")
-    print("   - 末了：python3 pipeline/audit_glossary.py 体检术语；git commit && git push")
+    print("   - 末了：python3 pipeline/audit_glossary.py 体检术语；python3 pipeline/audit_notes.py 体检笔记触发；"
+          "git commit && git push")
 
 
 if __name__ == "__main__":

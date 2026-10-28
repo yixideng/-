@@ -292,5 +292,48 @@ class TestNearTieAuto(unittest.TestCase):
         self.assertFalse(tools._resolve_gloss(es)[2])
 
 
+class TestNoteGating(unittest.TestCase):
+    NOTE = ("# 头\n> 说明里举例 `<!-- 状态：废止｜取代：§9 -->` 不算\n\n"
+            "## 1. 通则\n常驻内容\n\n"
+            "## 2. 专项\n<!-- 触发：ལྡོག་ཆ|ཐལ -->\n专项内容\n\n"
+            "## 3. 旧规\n<!-- 状态：废止｜取代：§1 -->\n旧内容\n\n"
+            "## 4. 新规\n<!-- 状态：观察 -->\n观察内容\n")
+
+    def test_untagged_always_and_trigger_miss_reported(self):
+        body, rep = tr.gate_sections(self.NOTE, "བུམ་པ་ཡོད།", "句法.md")
+        self.assertIn("常驻内容", body)
+        self.assertNotIn("专项内容", body)
+        self.assertIn("未触发从略 1 节（§2）", rep)
+        self.assertIn("从略 §2", body)            # 资料包内亦明示，漏注入可见
+
+    def test_trigger_hit_with_tsheg_variant(self):
+        body, rep = tr.gate_sections(self.NOTE, "ངོ་བོ་གཅིག་ཀྱང་ལྡོག༌ཆ་ཐ་དད།", "句法.md")
+        self.assertIn("专项内容", body)
+        self.assertIn("专项触发 1 节（§2）", rep)
+
+    def test_retired_excluded_watch_labelled(self):
+        body, rep = tr.gate_sections(self.NOTE, "", "句法.md")
+        self.assertNotIn("旧内容", body)
+        self.assertIn("已废止不注入 1 节（§3）", rep)   # 正文里举例的注释不算
+        self.assertIn("观察中", body)
+
+    def test_real_notes_audit_clean(self):
+        import subprocess
+        r = subprocess.run([sys.executable, str(ROOT / "pipeline/audit_notes.py")],
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout[-800:])
+
+    def test_core_rules_always_on(self):
+        """常驻通则（殿后前移、工具格、尚简、交付铁律）不得因无触发而缺席。"""
+        syn = (ROOT / "notes/句法.md").read_text(encoding="utf-8")
+        wf = (ROOT / "notes/文风.md").read_text(encoding="utf-8")
+        b1, _ = tr.gate_sections(syn, "བུམ་པ་ཡོད།")
+        b2, _ = tr.gate_sections(wf, "བུམ་པ་ཡོད།")
+        self.assertIn("## §48", b1)
+        self.assertIn("## §51", b1)
+        for h in ("## 13.", "## 14.", "## 交付形态铁律"):
+            self.assertIn(h, b2)
+
+
 if __name__ == "__main__":
     unittest.main()
