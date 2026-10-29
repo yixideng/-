@@ -356,6 +356,8 @@ class TestReflow611612(unittest.TestCase):
         self.assertFalse(g["རེས་འགའ"][2])
         self.assertTrue(g["དགོངས་གཞི"][0].startswith("意趣"))
         self.assertTrue(g["དབང་བསྒྱུར"][2])                 # 主宰｜自在转 按语境
+        self.assertEqual(g["འཇིག་ལྟ"][0].split("（")[0], "萨迦耶见")   # 全书统一（用户裁定·取代 4.10「身见」）
+        self.assertFalse(g["འཇིག་ལྟ"][2])
 
 
 if __name__ == "__main__":
