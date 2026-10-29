@@ -10,6 +10,7 @@
   4. 列出其余须人工判断的归档步骤（术语库／法义／句法·文风／校订本）
 """
 import argparse
+import re
 import shutil
 import subprocess
 import sys
@@ -20,6 +21,17 @@ import tmlib  # noqa: E402
 
 ROOT = tmlib.ROOT
 STASH = ROOT / "review/_机器直译稿留存"
+
+
+def half_width_hits(par: Path):
+    """校正版平行文汉译行里的半角 , ; : ! ? ( ) —— 返回 [(行号, 字符, 上下文)]。"""
+    hits = []
+    for i, l in enumerate(par.read_text(encoding="utf-8").splitlines(), 1):
+        if any(0x0F00 <= ord(c) <= 0x0FFF for c in l[:3]) or not any(0x4E00 <= ord(c) <= 0x9FFF for c in l):
+            continue
+        for m in re.finditer(r"[,;:!?()]", l):
+            hits.append((i, m.group(), l[max(0, m.start() - 8):m.start() + 6]))
+    return hits
 
 
 def main():
@@ -34,6 +46,12 @@ def main():
         sys.exit(f"找不到平行文 {par}")
     sec, _ = tmlib._parts(par, a.project)
     prefix = tmlib.PROJECTS[a.project]["prefix"]
+
+    halfw = half_width_hits(par)
+    if halfw:                                   # 校正版汉译行混入半角标点（全角铁律）→ 当场提示，不擅改
+        print(f"⚠ 校正版汉译行有 {len(halfw)} 处半角标点（应全角）：")
+        for ln, ch, ctx in halfw[:10]:
+            print(f"   第{ln}行 「{ch}」 …{ctx}…")
 
     print("① 对齐入译例")
     out = tmlib.align_one(par, a.project)

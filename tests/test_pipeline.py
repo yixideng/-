@@ -370,5 +370,15 @@ class TestReflow611612(unittest.TestCase):
         self.assertFalse(g["འཛིན་སྟངས"][2])
 
 
+class TestFullwidthInParallels(unittest.TestCase):
+    def test_no_half_width_punct_in_corrected_chinese(self):
+        """全部校正版平行文汉译行无半角标点（全角铁律）；新回流时 reflow.py 亦当场提示。"""
+        sys.path.insert(0, str(ROOT / "pipeline"))
+        import reflow
+        bad = [(p.name.split("_")[1], h) for p in (ROOT / "review").glob("gzhanstong_*_parallel.txt")
+               for h in reflow.half_width_hits(p)]
+        self.assertEqual(bad, [])
+
+
 if __name__ == "__main__":
     unittest.main()
