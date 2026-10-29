@@ -364,6 +364,8 @@ class TestReflow611612(unittest.TestCase):
         self.assertFalse(g["འཇིག་ལྟ"][2])
         self.assertEqual(g["ཕུང་གསུམ་པ"][0].split("（")[0], "第三聚")            # 6.11 用户裁定
         self.assertTrue(g["བརྟགས་ཏེ་དགག་པ"][0].startswith("观察而遮"))
+        self.assertTrue(g["འཛིན་སྟངས"][0].startswith("行相（执取相）"))     # 6.13 用户裁定·取代「执取方式」
+        self.assertFalse(g["འཛིན་སྟངས"][2])
 
 
 if __name__ == "__main__":
