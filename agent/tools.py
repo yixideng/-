@@ -238,7 +238,7 @@ def _gloss_entry(zh: str, freq: int, src: str, seq: int) -> GlossEntry:
     core = _CORE_CUT.split(zh, 1)[0].strip() or zh.strip()
     ctx = any(m in zh for m in _CTX_MARK)
     # 条目自列义项（「A｜B（按语境…）」）即显式多义：免单条词头只取首义而误强制
-    listed = ctx and "｜" in re.split(r"[（(]", zh, 1)[0]
+    listed = ctx and "｜" in re.sub(r"[（(][^（）()]*[）)]", "", zh)   # 括注之外另列义项
     return GlossEntry((zh, freq, tier, "多义" in src or listed, ctx, seq, core))
 
 

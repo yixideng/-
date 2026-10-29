@@ -345,6 +345,10 @@ class TestReflow611612(unittest.TestCase):
         """单条词头自列「A｜B（按语境…）」即多义，不得只取首义强制。"""
         es = [E("我想｜我所之想（按语境：缘自蕴＝我想）", 2, "校正版·用户裁定", 1)]
         self.assertTrue(tools._resolve_gloss(es)[2])
+        es = [E("能作缘（功用缘）｜俱有缘（按语境：略称时）", 2, "用户裁定", 1)]   # 「｜」在括注之后
+        self.assertTrue(tools._resolve_gloss(es)[2])
+        es = [E("自在（一般义；按语境作「自在转」｜勿删转）", 2, "用户裁定", 1)]   # 「｜」只在括注内→非自列多义
+        self.assertFalse(tools._resolve_gloss(es)[2])
 
     def test_brackets_unified_to_parens(self):
         self.assertEqual(tr._fullwidth_cn("若〔我〕实有"), "若（我）实有")
@@ -358,6 +362,8 @@ class TestReflow611612(unittest.TestCase):
         self.assertTrue(g["དབང་བསྒྱུར"][2])                 # 主宰｜自在转 按语境
         self.assertEqual(g["འཇིག་ལྟ"][0].split("（")[0], "萨迦耶见")   # 全书统一（用户裁定·取代 4.10「身见」）
         self.assertFalse(g["འཇིག་ལྟ"][2])
+        self.assertEqual(g["ཕུང་གསུམ་པ"][0].split("（")[0], "第三聚")            # 6.11 用户裁定
+        self.assertTrue(g["བརྟགས་ཏེ་དགག་པ"][0].startswith("观察而遮"))
 
 
 if __name__ == "__main__":
