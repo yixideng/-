@@ -264,7 +264,7 @@ class TestIdfRetrieval(unittest.TestCase):
         q = ("དཔེར་ན། འཕགས་པ་ཤཱ་རིའི་བུས་ཆོས་བསྟན་ཞེས་བརྗོད་དགོས་པ་ནི། དོན་ལ་དེའི་གཟུགས་དང༌། "
              "ཚོར་བ་དང༌། འདུ་ཤེས་དང༌། འདུ་བྱེད་དང༌། རྣམ་པར་ཤེས་པ་སྟེ། ཕུང་པོ་ལྔ")
         top = tools.search_tm(q, k=1)[0]
-        self.assertIn("舍利弗", top["zh"])
+        self.assertTrue("舍利弗" in top["zh"] or "舍利子" in top["zh"], top["zh"][:60])   # 6.12 校正版回流后同句译例居首
 
 
 class TestQaAndShrink(unittest.TestCase):
@@ -338,6 +338,24 @@ class TestNoteGating(unittest.TestCase):
         self.assertIn("## §51", b1)
         for h in ("## 13.", "## 14.", "## 交付形态铁律"):
             self.assertIn(h, b2)
+
+
+class TestReflow611612(unittest.TestCase):
+    def test_self_listed_senses_are_multi(self):
+        """单条词头自列「A｜B（按语境…）」即多义，不得只取首义强制。"""
+        es = [E("我想｜我所之想（按语境：缘自蕴＝我想）", 2, "校正版·用户裁定", 1)]
+        self.assertTrue(tools._resolve_gloss(es)[2])
+
+    def test_brackets_unified_to_parens(self):
+        self.assertEqual(tr._fullwidth_cn("若〔我〕实有"), "若（我）实有")
+        self.assertEqual(tr._fullwidth_cn("〔བོད〕"), "〔བོད〕")      # 无汉字行不动
+
+    def test_rulings_land(self):
+        g = tools.load_glossary()
+        self.assertEqual(g["རེས་འགའ"][0].split("／")[0], "有时")
+        self.assertFalse(g["རེས་འགའ"][2])
+        self.assertTrue(g["དགོངས་གཞི"][0].startswith("意趣"))
+        self.assertTrue(g["དབང་བསྒྱུར"][2])                 # 主宰｜自在转 按语境
 
 
 if __name__ == "__main__":

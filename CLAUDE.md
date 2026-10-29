@@ -159,7 +159,7 @@ python3 pipeline/reflow.py review/gzhanstong_<段>_<题>_parallel.txt \
 ## 改动流水线后（自检）
 
 ```bash
-python3 -m unittest discover tests      # 回归测试 39 项：术语择优·失败发声·词典选词·IDF检索·质检·润色对齐·法义节选…
+python3 -m unittest discover tests      # 回归测试 42 项：术语择优·失败发声·词典选词·IDF检索·质检·润色对齐·法义节选…
 python3 pipeline/audit_glossary.py      # 术语体检（强制术语在校正版上的命中率）
 python3 pipeline/audit_notes.py         # 笔记体检（专项规则触发词：漏触发/死触发/废止无取代）
 python3 pipeline/audit_glossary.py --conflicts   # 一词多译词头如何取舍（透明报告）
