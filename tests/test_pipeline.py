@@ -229,6 +229,11 @@ class TestLoudFailures(unittest.TestCase):
         self.assertEqual(tr.USAGE[-1]["in"], 15)
         self.assertEqual(len(tr.USAGE), n + 1)
 
+    def test_prompt_caching_disabled_for_inner_calls(self):
+        """CLI 默认 1 小时缓存写入＝2 倍输入价且从无复用：内层调用须关缓存。"""
+        d = self._fake_cli('echo "{\\"result\\": \\"$DISABLE_PROMPT_CACHING\\"}"')
+        self.assertEqual(self._run_with(d), "1")
+
     def test_resource_status_reports_missing_dict(self):
         saved = tools.DICT_DBS
         try:

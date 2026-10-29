@@ -13,6 +13,7 @@
 """
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -363,14 +364,18 @@ def _run_claude(prompt: str, model: str, guard: str) -> str:
     """调内层 claude 做纯文本任务。
     --system-prompt 取代 Claude Code 默认系统提示、--tools "" 禁用全部工具：实测「只答一字」的
     固定开销由 35,784 降至 1,527 输入 token（工具定义占绝大部分），每段两遍省约 7 万 token，
-    亦根除内层模型擅调工具/跑流水线之患。--output-format json 取真实用量。"""
+    亦根除内层模型擅调工具/跑流水线之患。--output-format json 取真实用量。
+    关提示缓存（DISABLE_PROMPT_CACHING）：CLI 默认把整包按 1 小时缓存「写入」计费＝2 倍输入价，
+    而资料包每段不同（待译/术语/译例/触发笔记各异）、两遍前缀也不同，实测从无复用——白付一倍。
+    关掉后按 1 倍计、提示字节不变，译文不受影响。日后若批量连翻多段、改为稳定前缀走系统提示，再议开启。"""
     cmd = ["claude", "-p", "--system-prompt", guard, "--tools", "",
            "--output-format", "json"]
     if model:
         cmd += ["--model", model]
+    env = dict(os.environ, DISABLE_PROMPT_CACHING="1")
     try:
         r = subprocess.run(cmd, input=prompt, capture_output=True, text=True,
-                           timeout=3000, cwd=tempfile.gettempdir())
+                           timeout=3000, cwd=tempfile.gettempdir(), env=env)
     except FileNotFoundError:
         raise ModelCallError("找不到 claude CLI（须安装并登录）")
     except subprocess.TimeoutExpired:
