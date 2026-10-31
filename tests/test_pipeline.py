@@ -100,6 +100,8 @@ class TestRealGlossary(unittest.TestCase):
                 continue
             if "参考" in r[3]:             # 已被新裁定明令取代（如 4.10「身见」、5.1「执取方式」）·有意退役
                 continue
+            self.assertFalse("用户裁定" in r[1] and not ("用户" in r[3] or "校订本" in r[3]),
+                             f"{r[0]}：「用户裁定」只写在汉译列、出处列未注，会被当成自动条目（层级被低估）")
             core = tools._CORE_CUT.split(r[1], 1)[0].strip()
             if r[0] in self.g and core not in self.g[r[0]][0]:
                 lost.append((r[0], core))
