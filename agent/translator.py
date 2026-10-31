@@ -59,6 +59,20 @@ def _sentence_end(clause: str) -> bool:
     return bool(syls) and (syls[-1] in TERMINATIVES or syls[-1].endswith("འོ"))
 
 
+# 引语标记：终结词后紧跟这些（「…བདེའོ། །…ལོ། །སྙམ་དུ」「…ནོ། །ཞེས」），引语未完，不算句末
+_QUOTE_HEAD = re.compile(r"^(ཞེས|ཅེས|ཤེས|སྙམ|ཟེར)")
+# 科判标题：序数开头（དང་པོ/གཉིས་པ…/དོན་ཚན་X་པ），领起一科；「X་པ་ལྟར་ན」（若如第X者）不算
+_ORDINAL = r"(དང་པོ|གཉིས་པ|གསུམ་པ|བཞི་པ|ལྔ་པ|དྲུག་པ|བདུན་པ|བརྒྱད་པ|དགུ་པ|བཅུ་པ|དོན་ཚན་\S+?་པ)"
+_HEAD_START = re.compile(r"^" + _ORDINAL + r"(?!་ལྟར)")
+_HEAD_END = re.compile(r"(ནི|ལ|ལས)།$")
+
+
+def _is_heading(sent) -> bool:
+    """一组分句是否为科判标题句：首分句序数开头、末分句以 ནི།/ལ།/ལས། 收、且无终结词（不含论述）。"""
+    return bool(sent) and bool(_HEAD_START.match(sent[0])) and bool(_HEAD_END.search(sent[-1])) \
+        and not any(_sentence_end(c) for c in sent) and len(sent) <= 4
+
+
 def split_segments(text: str, max_shad=16):
     """分段：**以原文自然段（换行）为单位，一段=一组对照**。
     单段整体保留（含段内「…ཡིན་ནོ། །ཞེས་པ…པའོ།」这类中途句号＋收束句），
@@ -77,31 +91,43 @@ def split_segments(text: str, max_shad=16):
     segs = []
     # 原文换行是作者给的自然段边界，优先采信；无换行则整体为一块
     blocks = [b.strip() for b in text.splitlines() if b.strip()] or [text]
+    carry = []                                # 上段末尾的科判标题，挪到本段开头（标题领起其下正文）
     for block in blocks:
-        parts = _shad_clauses(block)
-        if len(parts) <= max_shad:            # 常态：自然段整体成一组
-            if parts:
-                segs.append(" ".join(parts))
-            continue
-        # 超长段兜底：先按句末终结词切成整句，再贪心地把整句打包成 ≤max_shad 的组。
-        # 这样断点总落在真实句界（如 …གྲུབ་བོ།│རང་རིག་…），不会因「凑够 max_shad 才断」
-        # 而把两段论证挤在一起或越过句界；单句本身超长则整句保留（不腰斩）。
+        parts = carry + _shad_clauses(block)
+        carry = []
+        # 先切整句：句末＝终结词收尾且下一分句不是引语续接（「…ལོ། །སྙམ་དུ」「…ནོ། །ཞེས」）；
+        # 科判标题（序数开头）前亦断句，使标题自成一句、领起其后。
         sentences, cur = [], []
-        for p in parts:
+        for i, p in enumerate(parts):
+            if cur and _HEAD_START.match(p) and (_sentence_end(cur[-1]) or _is_heading(cur)):
+                sentences.append(cur)
+                cur = []
             cur.append(p)
-            if _sentence_end(p):
+            nxt = parts[i + 1] if i + 1 < len(parts) else ""
+            if _sentence_end(p) and not _QUOTE_HEAD.match(nxt):
                 sentences.append(cur)
                 cur = []
         if cur:                               # 末尾无终结词的残句自成一句
             sentences.append(cur)
+        if len(sentences) > 1 and _is_heading(sentences[-1]) and block is not blocks[-1]:
+            carry = sentences.pop()           # 段末悬空的科判标题 → 下一段开头
+        n = sum(len(x) for x in sentences)
+        if n <= max_shad:                     # 常态：自然段整体成一组（不因段内句号而拆）
+            if sentences:
+                segs.append(" ".join(c for x in sentences for c in x))
+            continue
+        # 超长段兜底：把整句贪心打包成 ≤max_shad 的组；断点总在真实句界（不腰斩、不切引语），
+        # 遇科判标题句另起一组（标题领起其下论述，与校正版按科分段一致）。单句超长则整句保留。
         group = []
         for sent in sentences:
-            if group and len(group) + len(sent) > max_shad:
+            if group and (len(group) + len(sent) > max_shad or _is_heading(sent)):
                 segs.append(" ".join(group))
                 group = []
             group += sent
         if group:
             segs.append(" ".join(group))
+    if carry:                                 # 全文末尾的标题（无后续段）自成一组
+        segs.append(" ".join(carry))
     return segs
 
 

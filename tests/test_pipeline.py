@@ -380,5 +380,31 @@ class TestFullwidthInParallels(unittest.TestCase):
         self.assertEqual(bad, [])
 
 
+class TestSegmentation(unittest.TestCase):
+    LONG = "དེ་ནི་ཡིན་ནོ། " * 10       # 凑超长段（>16 分句），触发兜底切分
+
+    def test_no_cut_before_quote_marker(self):
+        """终结词后紧跟 ཞེས/སྙམ（引语续接）不算句末：6.13「…བདེའོ། །…ལོ། །སྙམ་དུ」曾被腰斩。"""
+        t = self.LONG + "བདག་བདེའོ། །བདག་སྡུག་བསྔལ་ལོ། །སྙམ་དུ་སེམས་པ་ཡང་མི་རིགས་སོ། །" + "དེ་ནི་ཡིན་ནོ། " * 6
+        segs = tr.split_segments(t)
+        self.assertFalse(any(s.rstrip().endswith("བསྔལ་ལོ།") for s in segs), segs)
+
+    def test_heading_starts_segment_and_dangling_heading_carried(self):
+        """科判标题领起新组；段末悬空标题挪到下一段开头（6.13「第四科」曾粘在上段末）。"""
+        t = (self.LONG + "དེ་ནི་ཡིན་ནོ། " * 8 + "དོན་ཚན་བཞི་པ་ཚོགས་པ་ལ་བརྟགས་ཏེ་དགག་པ་ནི།\n"
+             "དཀོན་བརྩེགས་ལས་བསྟན་པ་ལྟར་རོ།")
+        segs = tr.split_segments(t)
+        self.assertTrue(segs[-1].startswith("དོན་ཚན་བཞི་པ"), segs[-1][:30])
+        self.assertFalse(any(s.endswith("དགག་པ་ནི།") for s in segs[:-1]))
+
+    def test_short_paragraph_kept_whole(self):
+        self.assertEqual(len(tr.split_segments("གཉིས་པ་ནི། ཡིན་ནོ། །ཞེས་སོ། །")), 1)
+
+    def test_heading_only_line_kept(self):
+        """用户把标题单列一行者照旧自成一组（6.12「第五科」「复广释彼义」皆单列）。"""
+        segs = tr.split_segments("གཉིས་པ་སྔ་ཕྱི་ལ་བརྟགས་ཏེ་དགག་པ་ནི།\nསྐྱེས་བུ་ལྷས་བྱིན་ཡིན་ནོ།")
+        self.assertEqual(len(segs), 2)
+
+
 if __name__ == "__main__":
     unittest.main()
