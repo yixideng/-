@@ -365,7 +365,9 @@ class TestReflow611612(unittest.TestCase):
         self.assertEqual(g["འཇིག་ལྟ"][0].split("（")[0], "萨迦耶见")   # 全书统一（用户裁定·取代 4.10「身见」）
         self.assertFalse(g["འཇིག་ལྟ"][2])
         self.assertEqual(g["ཕུང་གསུམ་པ"][0].split("（")[0], "第三聚")            # 6.11 用户裁定
-        self.assertTrue(g["བརྟགས་ཏེ་དགག་པ"][0].startswith("观察而遮"))
+        self.assertTrue(g["བརྟགས་ཏེ་དགག་པ"][2])                       # 6.13：观察……而破｜于彼观察而遮（遮／破两可）
+        self.assertIn("观察而遮", g["བརྟགས་ཏེ་དགག་པ"][0])
+        self.assertNotIn("གལ་ཏེ", {k for k, v in g.items() if v[0].startswith("倘若")})   # 校正版「倘若」0 次
         self.assertTrue(g["འཛིན་སྟངས"][0].startswith("行相（执取相）"))     # 6.13 用户裁定·取代「执取方式」
         self.assertFalse(g["འཛིན་སྟངས"][2])
 
