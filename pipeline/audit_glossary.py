@@ -144,6 +144,15 @@ def main():
     for bo, hit, n, zh in soften:
         print(f"  {hit:>3}/{n:<3} {bo} → {zh[:40]}")
 
+    # 用户层低采用：永不自动降级，只列出待用户裁定（多为语境专用裁定被泛化到一切语境，
+    # 如 གྱུར་པ→能变 2/116；资料包已对其标「⚠疑错配」，见 tools.mismatch_flags）
+    ulow = sorted([(bo, h, n, g[bo][0]) for bo, (h, n) in stat.items()
+                   if bo in user_bo and n >= tools.LANDING_MIN_N and h / n < tools.LANDING_MAX_RATE],
+                  key=lambda x: x[1] / x[2])
+    print(f"用户层低采用（触发≥{tools.LANDING_MIN_N}且采用率<{tools.LANDING_MAX_RATE:.0%}·不自动改·待裁定）：{len(ulow)} 个")
+    for bo, hit, n, zh in ulow:
+        print(f"  {hit:>3}/{n:<3} {bo} → {zh[:40]}")
+
     if args.apply and (demote or soften):
         dset = {d[0]: f"｜参考(校正命中{d[1]}/{d[2]})" for d in demote}
         dset.update({d[0]: f"｜多义·非强制(校正命中{d[1]}/{d[2]})" for d in soften})

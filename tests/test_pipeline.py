@@ -413,3 +413,49 @@ class TestSegmentation(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMismatchAndPerSegment(unittest.TestCase):
+    """错配体检＋分段资料（借鉴另一 agent 之「错配」「按句分组」；6.15 实测：质检 9 条全为误配）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        tools._glossary_cache = None
+        cls.g = tools.load_glossary()
+
+    def test_scan_does_not_cross_shad(self):
+        # 「…ལས། ཉོན…」不得拼成 ལས་ཉོན（业烦恼）
+        hits = [h[2] for h in tools.scan_glossary_spans("ཕྱིར་ལས། ཉོན་མོངས་པ་ཡིན།")]
+        self.assertNotIn("ལས་ཉོན", hits)
+        self.assertIn("ལས་ཉོན", [h[2] for h in tools.scan_glossary_spans("ལས་ཉོན་གྱིས་བསྐྱེད།")])
+
+    def test_grammar_note_entry_not_forced(self):
+        # ཐ་དད་པ 之「（动词）他动／及物」是句法通则说明，非译名：不得作强制术语（校正版 0/20）
+        zh, _f, _m = self.g["ཐ་དད་པ"]
+        self.assertNotIn("他动", tools._CORE_CUT.split(zh, 1)[0])
+
+    def test_low_landing_flagged(self):
+        flags = tools.mismatch_flags("ཕུང་པོ་འདི་ལས་མཆོག་ཏུ་གྱུར་པ་གཞན་ཞིག་དོན་དུ་གཉེར།")
+        self.assertIn("གྱུར་པ", flags)
+        self.assertIn("采用", flags["གྱུར་པ"])
+
+    def test_user_ruling_not_flagged_by_old_parallels(self):
+        # ལྟ་ཞོག＝遑论 系 6.13 用户裁定：旧校正版自然不用，不得据此标疑错配
+        self.assertIsNone(tools.low_landing("ལྟ་ཞོག"))
+
+    def test_packet_lists_terms_per_segment(self):
+        src = ("དང་པོ་ནི། སེམས་ཅན་རྣམས་ཀྱིས་ཤེས་སོ། །\n\n"
+               "གཉིས་པ་ནི། ཕུང་པོ་ལྔ་བདག་ཡིན་ནོ། །")
+        p = tr.build_packet(src)
+        self.assertIn("### 段1 资料", p)
+        self.assertIn("### 段2 资料", p)
+        seg1 = p.split("### 段1 资料")[1].split("### 段2 资料")[0]
+        seg2 = p.split("### 段2 资料")[1]
+        self.assertIn("སེམས་ཅན → **有情**", seg1)
+        self.assertNotIn("སེམས་ཅན → **有情**", seg2)
+        self.assertIn("ཕུང་པོ་ལྔ", seg2)
+
+    def test_qa_separates_suspect_mismatch(self):
+        bo = "ཕུང་པོ་འདི་ལས་མཆོག་ཏུ་གྱུར་པ་གཞན་ཞིག་དོན་དུ་གཉེར་བའི་ཕྱིར་རོ།"
+        iss = tr.qa_check(bo + "\n为求较此蕴更为殊胜之另一者故。")
+        self.assertTrue(any("疑错配" in x and "གྱུར་པ" in x for x in iss))

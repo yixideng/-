@@ -77,12 +77,13 @@ PROJECT = "gzhanstong"   # 当前项目；translator.py 依 --project 设定；�
 
 def set_project(name: str):
     """切换当前项目并清检索缓存。未知项目直接报错。"""
-    global PROJECT, _glossary_cache, _tm_cache
+    global PROJECT, _glossary_cache, _tm_cache, _landing_cache
     if name not in PROJECTS:
         raise SystemExit(f"未知项目：{name}；可选 {list(PROJECTS)}")
     PROJECT = name
     _glossary_cache = None
     _tm_cache = None
+    _landing_cache = None
 
 
 def _cfg():
@@ -119,6 +120,22 @@ def _stem_glued(syls):
 
 def syllables(bo: str):
     return [s for s in re.split(r"[་།༎\s]+", nfc(bo)) if s]
+
+
+def syllables_with_breaks(bo: str):
+    """音节表 + 分句（shad）起点集合：词不跨 shad，扫描时据此免把 …ལས། ཉོན… 拼成「ལས་ཉོན」。"""
+    syls, brk = [], set()
+    for chunk in re.split(r"[།༎]+", nfc(bo)):
+        ss = [x for x in re.split(r"[་\s]+", chunk) if x]
+        if ss:
+            brk.add(len(syls))
+        syls += ss
+    return syls, brk
+
+
+def crosses(brk, i, l) -> bool:
+    """[i, i+l) 是否跨分句边界。"""
+    return any(k in brk for k in range(i + 1, i + l))
 
 
 # ---------- 词典 ----------
@@ -167,6 +184,7 @@ def lookup_dict(word: str, compact=True):
 # ---------- 术语表 ----------
 
 _glossary_cache = None
+_user_ruled = set()   # 出处明写「用户」的词头（load_glossary 时填）：错配体检不以旧校正版采用率质疑之
 
 
 def load_glossary():
@@ -183,6 +201,7 @@ def load_glossary():
         # 积累术语，又能就本项目语境改写而不影响共享库。
         groups = {}   # bo -> [GlossEntry…]（同层内按文件行序，越后越新）
         seq = 0
+        _user_ruled.clear()
         for gf in _cfg()["glossary"]:
             if not gf.exists():
                 continue
@@ -205,6 +224,8 @@ def load_glossary():
                     fresh.add(bo)
                 seq += 1
                 groups.setdefault(bo, []).append(_gloss_entry(zh, freq, src, seq))
+                if "用户" in src:
+                    _user_ruled.add(bo)
         resolved = ((bo, _resolve_gloss(es)) for bo, es in groups.items() if es)
         _glossary_cache = {bo: v for bo, v in resolved if v is not None}
     return _glossary_cache
@@ -227,7 +248,9 @@ class GlossEntry(tuple):
 
 
 def _gloss_entry(zh: str, freq: int, src: str, seq: int) -> GlossEntry:
-    if "参考" in src:
+    # 「句法通则」条目是语法说明（如 ཐ་དད་པ＝他动词），不是译名：同参考，不进术语约束
+    # （曾因出处含「校订本」被当用户层强制，ཐ་དད་པ 在校正版 20 次触发 0 次采用）
+    if "参考" in src or "句法通则" in src:
         tier = 0
     elif "用户" in src or "校订本" in src:
         tier = 3
@@ -291,18 +314,20 @@ def resource_status() -> dict:
             "tm_files": len(tm_files), "tm": tm_n, "glossary": gl_n, "missing": missing}
 
 
-def scan_glossary(bo_text: str, max_len=8):
-    """在一段藏文上最长匹配术语表，返回 [(藏文, 汉译, 频次, 是否多义)]。
+def scan_glossary_spans(bo_text: str, max_len=8):
+    """最长匹配术语表，返回逐次命中 [(起始音节, 音节数, 词头)]（不去重，供错配体检定位）。
 
     最长匹配优先；整词未命中时，剥掉末音节的黏着格助词（如 འི/ས/ར）再试一次，
     使 སྟོང་པའི→སྟོང་པ、ངོ་བོས→ངོ་བོ、དོན་དམ་པར→དོན་དམ་པ 等带格形也能命中术语约束。
     """
     g = load_glossary()
-    syls = syllables(bo_text)
+    syls, brk = syllables_with_breaks(bo_text)
     hits, i, n = [], 0, len(syls)
     while i < n:
         matched, adv = None, 0
         for l in range(min(max_len, n - i), 1, -1):
+            if crosses(brk, i, l):              # 词不跨 shad（实测 16311 次命中中 7 次跨句错拼）
+                continue
             win = syls[i:i + l]
             cand = "་".join(win)
             if cand in g:                       # 原形命中
@@ -315,18 +340,126 @@ def scan_glossary(bo_text: str, max_len=8):
                     matched, adv = scand, l     # 消费原始 l 个音节（含格助词）
                     break
         if matched:
-            zh, freq, multi = g[matched]
-            hits.append((matched, zh, freq, multi))
+            hits.append((i, adv, matched))
             i += adv
         else:
             i += 1
-    # 去重保序
+    return hits
+
+
+def scan_glossary(bo_text: str, max_len=8):
+    """在一段藏文上最长匹配术语表，返回 [(藏文, 汉译, 频次, 是否多义)]（去重保序）。"""
+    g = load_glossary()
     seen, out = set(), []
-    for h in hits:
-        if h[0] not in seen:
-            seen.add(h[0])
-            out.append(h)
+    for _i, _l, bo in scan_glossary_spans(bo_text, max_len):
+        if bo not in seen:
+            seen.add(bo)
+            zh, freq, multi = g[bo]
+            out.append((bo, zh, freq, multi))
     return out
+
+
+# ---------- 错配体检（扫描器拿子串凑数而不报错：རྒྱུ་མཚན་མེད 里抽出 མཚན་མེད→「无相」）----------
+# 两个信号，只作标注（资料包 ⚠、质检归「疑错配」），**不改术语库、不撤强制**：
+#  ① 实测低采用：该词在用户校正版里触发≥5次、采用率<40%——多为语境专用裁定被泛化（གྱུར་པ→能变 2/116）
+#  ② 跨界：前一音节非虚词，且与本词首音节合成词典/术语词头——本词或为更长词之一截（རྒྱུ་མཚན|མེད）
+LANDING_MIN_N, LANDING_MAX_RATE = 5, 0.4
+_landing_cache = None
+_headword_cache = None
+_NONWORD_SYLS = {
+    "ནི", "དང", "ཀྱི", "གྱི", "གི", "ཡི", "ཀྱིས", "གྱིས", "གིས", "ཡིས", "ལ", "ན", "ཏུ", "དུ", "སུ",
+    "རུ", "ར", "ས", "འི", "འམ", "འང", "འོ", "སྟེ", "ཏེ", "ཅིང", "ཤིང", "ཞིང", "ཅེས", "ཞེས", "ཡང",
+    "ཀྱང", "ནས", "ལས", "ཞིག", "ཅིག", "ཤིག", "པར", "བར", "པའི", "བའི", "མ", "མི", "མེད", "མིན",
+}
+
+
+def _has_bo(s):  return any(0x0F00 <= ord(c) <= 0x0FFF for c in s)
+def _has_han(s): return any(0x4E00 <= ord(c) <= 0x9FFF for c in s)
+
+
+def parallel_pairs():
+    """当前项目全部用户校正版平行文的 (藏文行, 汉译行)。"""
+    rv = _cfg()["review"]
+    files = sorted(rv.glob("gzhanstong_*.txt")) if PROJECT == "gzhanstong" else \
+        sorted(rv.glob("*_parallel.txt"))
+    for p in files:
+        lines = [l.strip() for l in p.read_text(encoding="utf-8").splitlines()]
+        for i, l in enumerate(lines):
+            if _has_bo(l) and not _has_han(l):
+                j = i + 1
+                while j < len(lines) and not lines[j]:
+                    j += 1
+                if j < len(lines) and _has_han(lines[j]) and not _has_bo(lines[j][:1]):
+                    yield l, lines[j]
+
+
+def term_alts(zh: str):
+    """术语汉译的核心异写（「A／B（注）」→[A, B]），判断译名是否落地用。"""
+    core = _CORE_CUT.split(zh, 1)[0]
+    return [a for a in (x.strip(" 「」『』") for x in re.split(r"[／/、，,]", core)) if a]
+
+
+def term_landing():
+    """{词头: (采用, 触发)}：强制术语在用户校正版中实际被采用的次数（缓存）。"""
+    global _landing_cache
+    if _landing_cache is None:
+        g = load_glossary()
+        stat = {}
+        for bo_line, zh_line in parallel_pairs():
+            for bo, zh, _f, multi in scan_glossary(bo_line):
+                if multi:
+                    continue
+                h, n = stat.get(bo, (0, 0))
+                stat[bo] = (h + any(a in zh_line for a in term_alts(zh)), n + 1)
+        _landing_cache = stat
+    return _landing_cache
+
+
+def _headwords():
+    global _headword_cache
+    if _headword_cache is None:
+        hw = set()
+        for _, db in DICT_DBS:
+            if db.exists():
+                con = sqlite3.connect(db)
+                hw.update(h for (h,) in con.execute("SELECT DISTINCT headword FROM entries"))
+                con.close()
+        _headword_cache = hw
+    return _headword_cache
+
+
+def low_landing(bo: str):
+    """实测低采用 → 'a/n'；否则 None。出处明写「用户」者不报：新裁定常改动旧译名
+    （如 6.13 定 ལྟ་ཞོག＝遑论，旧校正版自然不用），以旧稿采用率质疑之即反客为主；只在体检报告待裁定。"""
+    load_glossary()
+    if bo in _user_ruled:
+        return None
+    h, n = term_landing().get(bo, (0, 0))
+    return f"{h}/{n}" if n >= LANDING_MIN_N and h / n < LANDING_MAX_RATE else None
+
+
+def mismatch_flags(bo_text: str):
+    """{词头: 疑错配理由}：对一段藏文逐次命中做错配体检（见上方两个信号）。"""
+    syls, brk = syllables_with_breaks(bo_text)
+    g, hw = load_glossary(), _headwords()
+    flags = {}
+    for i, l, bo in scan_glossary_spans(bo_text):
+        if g[bo][2]:
+            continue                                  # 多义条目本不强制，免查
+        why = []
+        rate = low_landing(bo)
+        if rate:
+            why.append(f"校正版实测仅 {rate} 采用此译")
+        if i > 0 and i not in brk and syls[i - 1] not in _NONWORD_SYLS:
+            for j in range(max(0, i - 3), i):
+                w = "་".join(syls[j:i + 1])
+                if not crosses(brk, j, i + 1 - j) and syls[j] not in _NONWORD_SYLS and \
+                        (w in hw or w in g):
+                    why.append(f"或为「{w}」之一截")
+                    break
+        if why and bo not in flags:
+            flags[bo] = "；".join(why)
+    return flags
 
 
 # ---------- 翻译记忆 ----------

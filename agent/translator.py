@@ -240,32 +240,88 @@ DICT_MAX = 60      # 词典释义最多列词数（按译例语料罕见度挑�
 MORPH_MAX = 20
 
 
-def render_dict_hits(dict_hits):
-    """词典释义：命中常达数百词，不能全列（会撑爆资料包），亦不可按文中先后静默截断
+def pick_dict_hits(dict_hits) -> set:
+    """词典释义择词：命中常达数百词，不能全列（会撑爆资料包），亦不可按文中先后静默截断
     （旧法 dict_hits[:25]：6.12 命中 301 词只列前 25，后文难词如「增一阿含」「卸担」全丢）。
     改按「在已译语料中的出现次数」升序挑最罕见的 DICT_MAX 个——常见词早有译例/术语定译，
-    罕见词才最需词典；按原文次序列出，每词一行：主典义 ＋ 余典之简短汉译旁参；从略者明示数目。"""
+    罕见词才最需词典。"""
+    corpus = tools.tm_corpus()
+    words = list(dict.fromkeys(w for w, _ in dict_hits))      # 去重（同词多段命中只算一次）
+    return set(sorted(words, key=corpus.count)[:DICT_MAX])
+
+
+def _dict_line(word, entries):
+    """每词一行：主典义 ＋ 余典之简短汉译旁参。"""
+    main = entries[0]
+    line = f"- {word}〔{main['source']}〕" + "；".join(main["senses"])[:100]
+    extra = []
+    for e in entries[1:]:
+        short = "；".join(e["senses"])
+        if e["source"] != main["source"] and len(short) <= 24 and \
+                any(0x4E00 <= ord(c) <= 0x9FFF for c in short):
+            extra.append(f"{e['source'][:4]}：{short}")
+    if extra:
+        line += "｜旁参 " + "｜".join(extra[:2])
+    return line
+
+
+def render_dict_hits(dict_hits):
+    """整篇一张表（按原文次序，从略者明示数目）；分段资料包用 pick_dict_hits＋_dict_line。"""
     if not dict_hits:
         return ["（无词典命中）"]
-    corpus = tools.tm_corpus()
-    pick = set(w for w, _ in sorted(dict_hits, key=lambda h: corpus.count(h[0]))[:DICT_MAX])
-    out = []
-    for word, entries in dict_hits:
-        if word not in pick:
-            continue
-        main = entries[0]
-        line = f"- {word}〔{main['source']}〕" + "；".join(main["senses"])[:100]
-        extra = []
-        for e in entries[1:]:
-            short = "；".join(e["senses"])
-            if e["source"] != main["source"] and len(short) <= 24 and \
-                    any(0x4E00 <= ord(c) <= 0x9FFF for c in short):
-                extra.append(f"{e['source'][:4]}：{short}")
-        if extra:
-            line += "｜旁参 " + "｜".join(extra[:2])
-        out.append(line)
+    pick = pick_dict_hits(dict_hits)
+    out = [_dict_line(w, es) for w, es in dict_hits if w in pick]
     if len(dict_hits) > len(pick):
         out.append(f"（另有 {len(dict_hits) - len(pick)} 个较常见词从略——已有译例/术语可循）")
+    return out
+
+
+def scan_dict(text: str, covered: set):
+    """对术语表未覆盖的多音节词查词典（最长匹配 8→2 音节，词不跨 shad）。返回 [(词, 条目)]。"""
+    hits = []
+    syls, brk = tools.syllables_with_breaks(text)
+    i = 0
+    while i < len(syls):
+        matched = None
+        for l in range(min(8, len(syls) - i), 1, -1):
+            if tools.crosses(brk, i, l):
+                continue
+            cand = "་".join(syls[i:i + l])
+            if cand in covered:
+                continue
+            res = tools.lookup_dict(cand)
+            if res:
+                matched = (cand, res)
+                break
+        if matched:
+            hits.append(matched)
+            i += len(matched[0].split("་"))
+        else:
+            i += 1
+    return hits
+
+
+def scan_morph(text: str, glo, dict_hits):
+    """逐字参考（兜底·治「术语表词汇有限」）：既未命中术语表、又未作为复合词命中词典的
+    「实词单字」，拆开逐字查词典，给模型合成的原料——如 ཡོངས＝周遍、དཔྱོད＝观察 → 周遍观察，
+    免得模型在毫无参考时把 དཔྱོད 误读作近形字 སྤྱོད(受用) 而臆造「领受」。"""
+    covered_syls = set()
+    for g in glo:
+        covered_syls.update(g[0].split("་"))
+    for w, _ in dict_hits:
+        content = [x for x in w.split("་") if x not in PARTICLE_SYLS]
+        if len(content) >= 2:             # 仅「真·多实词复合词」算已覆盖；
+            covered_syls.update(content)  # 单实词+格助词(如 དཔྱོད་ཀྱིས)不算，留给逐字层取 +པ 丰义
+    out, seen = [], set()
+    for syl in tools.syllables(text):
+        if syl in covered_syls or syl in seen or syl in PARTICLE_SYLS:
+            continue
+        for form in (syl + "་པ", syl):        # 先试动词/名词式(如 དཔྱོད་པ)，再试裸字
+            res = tools.lookup_dict(form)
+            if res:
+                seen.add(syl)
+                out.append((syl, form, "；".join(res[0]["senses"])[:80]))
+                break
     return out
 
 
@@ -294,84 +350,75 @@ def build_packet(text: str, missing=None) -> str:
     for i, s in enumerate(segs, 1):
         lines.append(f"[段{i}] {s}")
 
-    # 术语约束（全篇扫描）
-    glo = tools.scan_glossary(text)
-    fixed = [g for g in glo if not g[3]]
-    multi = [g for g in glo if g[3]]
-    lines.append("\n## 术语约束（必须采用的译法）\n")
-    if fixed:
-        for bo, zh, freq, _ in fixed:
-            lines.append(f"- {bo} → **{zh}**（本传承译本中出现 {freq} 次）")
-    else:
-        lines.append("（本段未命中术语表）")
-
-    if multi:
-        lines.append("\n## 多义词（依语境择一，非强制；判别线索见括号）\n")
-        for bo, zh, _, _ in multi:
-            lines.append(f"- {bo} → {zh}")
-
-    # 词典释义：对术语表未覆盖的多音节词查词典
-    covered = {g[0] for g in glo}
-    dict_hits, seen = [], set()
-    syls = tools.syllables(text)
-    i = 0
-    while i < len(syls):
-        matched = None
-        for l in range(min(8, len(syls) - i), 1, -1):
-            cand = "་".join(syls[i:i + l])
-            if cand in seen or cand in covered:
-                continue
-            res = tools.lookup_dict(cand)
-            if res:
-                matched = (cand, res)
-                break
-        if matched:
-            seen.add(matched[0])
-            dict_hits.append(matched)
-            i += len(matched[0].split("་"))
+    # 分段资料（按句分组·治注意力稀释）：旧版整篇一张术语表/词典表，12 段共用，模型译某段时
+    # 须在全篇清单里自找本段之词。今按段列出本段命中者——条目一个不少，注意力收窄到本段。
+    # 术语/多义每段重列（短）；词典、逐字参考只在首见之段列（长，免重复膨胀）；译例本就逐段。
+    seg_glo = [tools.scan_glossary(s) for s in segs]
+    seg_flag = [tools.mismatch_flags(s) for s in segs]
+    covered = {g[0] for gl in seg_glo for g in gl}
+    seg_dict = [scan_dict(s, covered) for s in segs]
+    pick = pick_dict_hits([h for sd in seg_dict for h in sd])
+    seg_morph = [scan_morph(s, seg_glo[k], seg_dict[k]) for k, s in enumerate(segs)]
+    n_dict = len({w for sd in seg_dict for w, _ in sd})
+    lines.append("\n## 分段资料（每段只列本段命中者）\n")
+    lines.append("- **术语约束**＝必须采用的译法；标 ⚠疑错配 者先核本句：若该词在此实为更长词之一截、"
+                 "或属语境专用之裁定而本句语境不合，按文义译，并在校勘一句带过。")
+    lines.append("- **多义词**＝依语境择一，非强制；判别线索见括号。")
+    lines.append("- **词典释义**＝参考；取义优先级：藏汉大辞典＞格西曲扎＞瑜伽师地论词汇表＞宝性论大疏词汇表；"
+                 "同词多典义项相异时，以靠前者〔尤藏汉大辞典〕为准，余典作旁参，勿随后典飘移。"
+                 "同一词只在首见之段列出。")
+    lines.append("- **逐字参考**＝复合词未成词条时，供逐字合成；非强制，仅作原料。")
+    lines.append("- **参考译例**＝同一译者已定稿译本，模仿其文体。")
+    dict_seen, morph_seen, n_morph = set(), set(), 0
+    for k, seg in enumerate(segs):
+        lines.append(f"\n### 段{k + 1} 资料\n")
+        fixed = [g for g in seg_glo[k] if not g[3]]
+        multi = [g for g in seg_glo[k] if g[3]]
+        lines.append("**术语约束（必须采用）**")
+        if fixed:
+            for bo, zh, freq, _ in fixed:
+                warn = f"　⚠疑错配：{seg_flag[k][bo]}" if bo in seg_flag[k] else ""
+                lines.append(f"- {bo} → **{zh}**（本传承译本中出现 {freq} 次）{warn}")
         else:
-            i += 1
-    lines.append("\n## 词典释义（参考·取义优先级：藏汉大辞典＞格西曲扎＞瑜伽师地论词汇表＞宝性论大疏词汇表；"
-                 "同词多典义项相异时，以靠前者〔尤藏汉大辞典〕为准，余典作旁参，勿随后典飘移）\n")
-    lines += render_dict_hits(dict_hits)
-
-    # 逐字参考（兜底·治「术语表词汇有限」）：既未命中术语表、又未作为复合词命中词典的
-    # 「实词单字」，拆开逐字查词典，给模型合成的原料——如 ཡོངས＝周遍、དཔྱོད＝观察 → 周遍观察，
-    # 免得模型在毫无参考时把 དཔྱོད 误读作近形字 སྤྱོད(受用) 而臆造「领受」。
-    covered_syls = set()
-    for g in glo:
-        covered_syls.update(g[0].split("་"))
-    for w, _ in dict_hits:
-        content = [s for s in w.split("་") if s not in PARTICLE_SYLS]
-        if len(content) >= 2:             # 仅「真·多实词复合词」算已覆盖；
-            covered_syls.update(content)  # 单实词+格助词(如 དཔྱོད་ཀྱིས)不算，留给逐字层取 +པ 丰义
-    morph_hits, morph_seen = [], set()
-    for syl in syls:
-        if syl in covered_syls or syl in morph_seen or syl in PARTICLE_SYLS:
-            continue
-        for form in (syl + "་པ", syl):        # 先试动词/名词式(如 དཔྱོད་པ)，再试裸字
-            res = tools.lookup_dict(form)
-            if res:
-                morph_seen.add(syl)
-                sense = "；".join(res[0]["senses"])[:80]
-                morph_hits.append((syl, form, sense))
-                break
-    if morph_hits:
-        lines.append("\n## 逐字参考（复合词未成词条时，供逐字合成；非强制，仅作原料）\n")
-        for syl, form, sense in morph_hits[:MORPH_MAX]:
+            lines.append("（本段未命中术语表）")
+        if multi:
+            lines.append("\n**多义词（依语境择一）**")
+            for bo, zh, _, _ in multi:
+                lines.append(f"- {bo} → {zh}")
+        dl = []
+        for w, es in seg_dict[k]:
+            if w in pick and w not in dict_seen:
+                dict_seen.add(w)
+                dl.append(_dict_line(w, es))
+        if dl:
+            lines.append("\n**词典释义**")
+            lines += dl
+        ml = []
+        for syl, form, sense in seg_morph[k]:
+            if syl in morph_seen or n_morph >= MORPH_MAX:
+                continue
+            morph_seen.add(syl)
+            n_morph += 1
             tag = f"〔查 {form}〕" if form != syl else ""
-            lines.append(f"- {syl}{tag} → {sense}")
-        if len(morph_hits) > MORPH_MAX:
-            lines.append(f"（另有 {len(morph_hits) - MORPH_MAX} 个单字从略）")
-
-    # 相似译例
-    lines.append("\n## 参考译例（同一译者已定稿译本，模仿其文体）\n")
-    for i, s in enumerate(segs, 1):
-        for ex in tools.search_tm(s, k=2):
-            if ex["score"] >= tools.TM_MIN_SCORE:
+            ml.append(f"- {syl}{tag} → {sense}")
+        if ml:
+            lines.append("\n**逐字参考**")
+            lines += ml
+        tm = [ex for ex in tools.search_tm(seg, k=2) if ex["score"] >= tools.TM_MIN_SCORE]
+        if tm:
+            lines.append("\n**参考译例**")
+            for ex in tm:
                 lines.append(f"- 〔{ex['source']}｜相似度{ex['score']}〕")
                 lines.append(f"  藏：{ex['bo']}")
                 lines.append(f"  汉：{ex['zh']}")
+    n_morph_all = len({m[0] for sm in seg_morph for m in sm})
+    foot = []
+    if n_dict > len(pick):
+        foot.append(f"词典另有 {n_dict - len(pick)} 个较常见词从略——已有译例/术语可循")
+    if n_morph_all > n_morph:
+        foot.append(f"逐字参考另有 {n_morph_all - n_morph} 个单字从略")
+    if foot:
+        lines.append("\n（" + "；".join(foot) + "）")
 
     lines.append("\n---\n请按系统指令逐段翻译上方【待译原文】。")
     return "\n".join(lines)
@@ -522,7 +569,7 @@ def _han(t: str) -> int:
 def qa_check(final: str) -> list:
     """生成后忠实性质检（只报告，不改稿）：逐段查 ①强制术语是否落地 ②汉藏长度比是否异常（疑漏译）。
     曾只校「藏文行数不变」，强制术语没落地、整句被吞都不会被发现。"""
-    issues = []
+    issues, suspect = [], []
     body, _ = _split_tail(final)
     for i, (_k, txt) in enumerate(_bo_pairs(body), 1):
         lines = txt.splitlines()
@@ -530,14 +577,18 @@ def qa_check(final: str) -> list:
         n_syl = len(tools.syllables(bo))
         if n_syl >= 15 and _han(zh) < LEN_RATIO_MIN * n_syl:
             issues.append(f"第{i}段 汉字/藏文音节 = {_han(zh) / n_syl:.2f}（基准 0.88），疑漏译")
+        flags = tools.mismatch_flags(bo)
         for t_bo, t_zh, _f, multi in tools.scan_glossary(bo):
             if multi:
                 continue
             core = tools._CORE_CUT.split(t_zh, 1)[0]
-            alts = [a.strip(" 「」『』") for a in re.split(r"[／/、，,]", core) if a.strip()]
+            alts = tools.term_alts(t_zh)
             if alts and not any(a in zh for a in alts):
-                issues.append(f"第{i}段 强制术语未落地：{t_bo} → {core}")
-    return issues
+                if t_bo in flags:                  # 疑错配：多半是扫描器误配，归后列，免淹没真问题
+                    suspect.append(f"第{i}段 强制术语未落地（疑错配·{flags[t_bo]}）：{t_bo} → {core}")
+                else:
+                    issues.append(f"第{i}段 强制术语未落地：{t_bo} → {core}")
+    return issues + suspect
 
 
 def _bo_pairs(body: str):
