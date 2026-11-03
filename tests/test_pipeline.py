@@ -404,10 +404,11 @@ class TestSegmentation(unittest.TestCase):
     def test_short_paragraph_kept_whole(self):
         self.assertEqual(len(tr.split_segments("གཉིས་པ་ནི། ཡིན་ནོ། །ཞེས་སོ། །")), 1)
 
-    def test_heading_only_line_kept(self):
-        """用户把标题单列一行者照旧自成一组（6.12「第五科」「复广释彼义」皆单列）。"""
+    def test_heading_only_line_merged_into_next(self):
+        """单独成行的科判标题并入下一段正文（6.13/6.14 校正版一律如此）。"""
         segs = tr.split_segments("གཉིས་པ་སྔ་ཕྱི་ལ་བརྟགས་ཏེ་དགག་པ་ནི།\nསྐྱེས་བུ་ལྷས་བྱིན་ཡིན་ནོ།")
-        self.assertEqual(len(segs), 2)
+        self.assertEqual(len(segs), 1)
+        self.assertTrue(segs[0].startswith("གཉིས་པ་སྔ་ཕྱི"))
 
 
 if __name__ == "__main__":

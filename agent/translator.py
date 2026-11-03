@@ -109,8 +109,10 @@ def split_segments(text: str, max_shad=16):
                 cur = []
         if cur:                               # 末尾无终结词的残句自成一句
             sentences.append(cur)
-        if len(sentences) > 1 and _is_heading(sentences[-1]) and block is not blocks[-1]:
-            carry = sentences.pop()           # 段末悬空的科判标题 → 下一段开头
+        if sentences and _is_heading(sentences[-1]) and block is not blocks[-1]:
+            carry = sentences.pop()           # 段末悬空／单独成行的科判标题 → 并入下一段开头
+            if not sentences:                 # 整行只是标题：校正版把它并入下文正文（6.13/6.14 一律如此；
+                continue                      # 6.12 标题单列仅因其下紧接用户补入的根颂，待译稿无根颂）
         n = sum(len(x) for x in sentences)
         if n <= max_shad:                     # 常态：自然段整体成一组（不因段内句号而拆）
             if sentences:
