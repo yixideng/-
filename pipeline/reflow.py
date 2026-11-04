@@ -85,6 +85,8 @@ def main():
     print("     · 用户明确裁定者直接生效；仅由 diff 归纳、用户未表态者加 <!-- 状态：观察 -->")
     print("     · 新规取代旧节：旧节加 <!-- 状态：废止｜取代：§N -->（原文留档、不再注入）")
     print(f"   - 校订本：review/{prefix}_{sec}_…_校订本.md（根颂·汉传引文·前译↔校正差异）")
+    print("   - 体量守恒（用户裁定·恒常）：新规先问能否并入既有总则（语序→文风§0.3 子项），能并则并、不另立节；"
+          "回流后报告常驻笔记字数变化（audit_notes 末行），规则只增不减即须找可删并之细则")
     print("   - 末了：python3 pipeline/audit_glossary.py 体检术语；python3 pipeline/audit_notes.py 体检笔记触发；"
           "git commit && git push")
 
