@@ -434,10 +434,23 @@ class TestMismatchAndPerSegment(unittest.TestCase):
         zh, _f, _m = self.g["ཐ་དད་པ"]
         self.assertNotIn("他动", tools._CORE_CUT.split(zh, 1)[0])
 
+    def _with_low_landing(self, term):
+        """注入一条「校正版采用 0/10」的实测，免依赖术语库现状（གྱུར་པ 已按体检改多义）。"""
+        tools.term_landing()
+        saved = dict(tools._landing_cache)
+        tools._landing_cache[term] = (0, 10)
+        return saved
+
     def test_low_landing_flagged(self):
-        flags = tools.mismatch_flags("ཕུང་པོ་འདི་ལས་མཆོག་ཏུ་གྱུར་པ་གཞན་ཞིག་དོན་དུ་གཉེར།")
-        self.assertIn("གྱུར་པ", flags)
-        self.assertIn("采用", flags["གྱུར་པ"])
+        term = "ཕུང་པོ་ལྔ"
+        self.assertNotIn(term, tools._user_ruled)
+        saved = self._with_low_landing(term)
+        try:
+            flags = tools.mismatch_flags("བདག་ནི་ཕུང་པོ་ལྔ་ལས་ཐ་དད།")
+            self.assertIn(term, flags)
+            self.assertIn("采用", flags[term])
+        finally:
+            tools._landing_cache = saved
 
     def test_user_ruling_not_flagged_by_old_parallels(self):
         # ལྟ་ཞོག＝遑论 系 6.13 用户裁定：旧校正版自然不用，不得据此标疑错配
@@ -456,6 +469,28 @@ class TestMismatchAndPerSegment(unittest.TestCase):
         self.assertIn("ཕུང་པོ་ལྔ", seg2)
 
     def test_qa_separates_suspect_mismatch(self):
-        bo = "ཕུང་པོ་འདི་ལས་མཆོག་ཏུ་གྱུར་པ་གཞན་ཞིག་དོན་དུ་གཉེར་བའི་ཕྱིར་རོ།"
-        iss = tr.qa_check(bo + "\n为求较此蕴更为殊胜之另一者故。")
-        self.assertTrue(any("疑错配" in x and "གྱུར་པ" in x for x in iss))
+        saved = self._with_low_landing("ཕུང་པོ་ལྔ")
+        try:
+            bo = "བདག་ནི་ཕུང་པོ་ལྔ་ལས་ཐ་དད་པར་འདོད་པའི་ཕྱིར་རོ།"
+            iss = tr.qa_check(bo + "\n许我异于诸蕴故，此说不应理而须破之。")
+            self.assertTrue(any("疑错配" in x and "ཕུང་པོ་ལྔ" in x for x in iss))
+        finally:
+            tools._landing_cache = saved
+
+
+class TestWordOrderQA(unittest.TestCase):
+    """语序病句质检：机器稿型句式报出，用户校正版零误报（看 §0.3/铁律⑨ 是否生效）。"""
+
+    def test_detects_postposed_quantifier(self):
+        hits = tools.word_order_hits("执我以伴侣之方式具五蕴一一，是为十。")
+        self.assertTrue(any("一一" in h[0] for h in hits))
+        self.assertFalse(tools.word_order_hits("执我以伴侣之方式逐一具五蕴，是为十。"))
+
+    def test_detects_youwu_and_nominal_object(self):
+        self.assertTrue(tools.word_order_hits("故从三有解脱之有无，由此比度。"))
+        self.assertTrue(tools.word_order_hits("虽为「我与蕴应成一」之能违害正理"))
+        self.assertFalse(tools.word_order_hits("「诸事不住过刹那」之能立"))   # 能立为术语名词，不报
+
+    def test_zero_false_positive_on_user_corpus(self):
+        n = sum(len(tools.word_order_hits(zh)) for _bo, zh in tools.parallel_pairs())
+        self.assertEqual(n, 0)

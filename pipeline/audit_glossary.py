@@ -109,6 +109,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true", help="落盘降级")
     ap.add_argument("--conflicts", action="store_true", help="只列一词多译词头的取舍（透明报告）")
+    ap.add_argument("--check-src", metavar="标记",
+                    help="只查出处含此标记的新收条目（如 6.15校正版）在历史校正版上的采用率——"
+                         "回流新收术语后必跑：低采用＝把本段语境的译法泛化成了全书强制，宜改「按语境」多义")
     ap.add_argument("--min-n", type=int, default=5, help="触发≥此次数才按命中率评")
     ap.add_argument("--zero-n", type=int, default=3, help="触发≥此次数且零命中亦降级")
     ap.add_argument("--max-rate", type=float, default=0.34, help="命中率低于此值降级为参考(不进资料包)")
@@ -117,6 +120,16 @@ def main():
     if args.conflicts:
         conflicts_report()
         return
+    if args.check_src:
+        new = {l.split("\t")[0] for l in GLOSSARY.read_text(encoding="utf-8").splitlines()[1:]
+               if len(l.split("\t")) > 3 and args.check_src in l.split("\t")[3]}
+        g0, st0 = audit()
+        bad = sorted(((bo, *st0[bo]) for bo in new if bo in st0 and st0[bo][1] >= 3
+                      and st0[bo][0] / st0[bo][1] < 0.6), key=lambda x: x[1] / x[2])
+        print(f"出处含「{args.check_src}」的条目 {len(new)} 个；强制且历史采用率<60%（触发≥3）：{len(bad)} 个")
+        for bo, h, n in bad:
+            print(f"  {h:>3}/{n:<3} {bo} → {g0[bo][0][:40]}")
+        sys.exit(1 if bad else 0)
 
     g, stat = audit()
     rows = [l.split("\t") for l in GLOSSARY.read_text(encoding="utf-8").splitlines()]

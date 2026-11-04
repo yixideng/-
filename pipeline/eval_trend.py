@@ -11,6 +11,7 @@
 早期个别段（如 6.9）留存稿已含会话中修正，数值偏乐观，表中标「*」。
 """
 import argparse
+from collections import Counter
 import datetime
 import difflib
 import re
@@ -92,10 +93,18 @@ def evaluate(project: str = "gzhanstong"):
         common = [k for k in M if k in P]
         if len(common) < 2:
             continue
-        sims = [difflib.SequenceMatcher(None, _PUNCT.sub("", M[k]), _PUNCT.sub("", P[k])).ratio()
-                for k in common]
+        sims, bags = [], []
+        for k in common:
+            a, b = _PUNCT.sub("", M[k]), _PUNCT.sub("", P[k])
+            sims.append(difflib.SequenceMatcher(None, a, b).ratio())
+            ca, cb = Counter(a), Counter(b)            # 用字重合（不计次序）
+            bags.append(2 * sum((ca & cb).values()) / max(len(a) + len(b), 1))
         hit, n = term_adoption(par)
+        wo = sum(len(tools.word_order_hits(z)) for z in M.values())      # 机器稿语序硬病句数
+        chars = sum(len(z) for z in M.values()) or 1
         rows.append({"sec": sec, "n": len(common), "sim": sum(sims) / len(sims),
+                     "wo": wo, "wo_k": wo * 1000 / chars,
+                     "reord": (sum(bags) - sum(sims)) / len(sims),
                      "term": (hit / n) if n else None, "flag": "*" if sec in CONTAMINATED else ""})
     key = lambda r: [int(x) if x.isdigit() else x for x in re.split(r"[.]", re.sub(r"[a-z]$", "", r["sec"]))]
     return sorted(rows, key=key)
@@ -107,17 +116,23 @@ def render(rows):
          f"> 自动生成（`python3 pipeline/eval_trend.py`），最近更新 {today}。",
          "> **相似度**＝按句对齐后汉译（去标点）字符级相似度，越高＝用户改得越少；",
          "> **改动率**≈1−相似度；**术语采用**＝该段校正版上强制术语被用户采用之比（以当前术语库回测）。",
+         "> **语序病**＝机器稿中藏式语序硬句型数（`tools.word_order_hits`：「五蕴一一」「之有无」「X之能V」等；"
+         "用户校正版上实测 0 次），看文风 §0.3/指令铁律⑨是否生效。",
+         "> **语序差**＝用字重合度−相似度：字差不多而次序不同的那部分改动（越低＝用户调语序越少；5.27–6.15 平均约 0.07）。",
          "> 「*」＝留存机器稿含会话中修正，数值偏乐观。", "",
-         "| 段 | 对齐句数 | 相似度 | 改动率 | 术语采用 | 趋势 |", "|---|---|---|---|---|---|"]
+         "| 段 | 对齐句数 | 相似度 | 改动率 | 术语采用 | 语序病 | 语序差 | 趋势 |", "|---|---|---|---|---|---|---|---|"]
     for r in rows:
         term = f"{r['term']:.0%}" if r["term"] is not None else "—"
         L.append(f"| {r['sec']}{r['flag']} | {r['n']} | {r['sim']:.2f} | {1 - r['sim']:.0%} | {term} | "
-                 f"{'█' * round(r['sim'] * 20)} |")
+                 f"{r['wo']} | {r['reord']:.3f} | {'█' * round(r['sim'] * 20)} |")
     clean = [r for r in rows if not r["flag"]]
     if clean:
         recent = clean[-3:]
         L += ["", f"**近 3 段平均相似度 {sum(r['sim'] for r in recent) / len(recent):.2f}**"
-                  f"（全部 {len(clean)} 段平均 {sum(r['sim'] for r in clean) / len(clean):.2f}，不含*）"]
+                  f"（全部 {len(clean)} 段平均 {sum(r['sim'] for r in clean) / len(clean):.2f}，不含*）",
+              f"**语序病**：近 3 段 {sum(r['wo'] for r in recent)} 处·全部 {sum(r['wo'] for r in clean)} 处；"
+              f"**语序差**：近 3 段 {sum(r['reord'] for r in recent) / len(recent):.3f}·全部 "
+              f"{sum(r['reord'] for r in clean) / len(clean):.3f}"]
     return "\n".join(L) + "\n"
 
 

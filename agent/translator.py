@@ -577,6 +577,8 @@ def qa_check(final: str) -> list:
         n_syl = len(tools.syllables(bo))
         if n_syl >= 15 and _han(zh) < LEN_RATIO_MIN * n_syl:
             issues.append(f"第{i}段 汉字/藏文音节 = {_han(zh) / n_syl:.2f}（基准 0.88），疑漏译")
+        for name, frag, fix in tools.word_order_hits(zh):
+            issues.append(f"第{i}段 疑语序病（{name}）：…{frag}…——{fix}")
         flags = tools.mismatch_flags(bo)
         for t_bo, t_zh, _f, multi in tools.scan_glossary(bo):
             if multi:

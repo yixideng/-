@@ -462,6 +462,29 @@ def mismatch_flags(bo_text: str):
     return flags
 
 
+# ---------- 语序病句质检（文风 §0.3 是否生效的客观指标）----------
+# 只收「用户校正版里几乎不出现、机器稿里会出现」的硬句型（于全部校正版 11.4 万字上实测误报≈0）。
+# 规则写进笔记不等于生效（6.15：§0.3 明写，译文仍作「具五蕴一一」），故以脚本计数看效果。
+_H = "[\u4e00-\u9fff]"
+_END = "(?=[，。；：、」）]|$)"
+WORD_ORDER_PATTERNS = [
+    ("量词后置「一一」", re.compile(_H + "{2}一一" + _END), "逐一／一一 须在动词前：「逐一具五蕴」"),
+    ("量词后置「等一切」", re.compile(_H + "{2}(?<![彼此])等一切" + _END), "一切须在名词前：「一切苦乐等」"),
+    # 〔「彼等一切」「凡此一切」「摄尽一切」等「一切」作代词/宾语者校正版常用，不报〕
+    ("「之有无」殿后", re.compile("之有无"), "作「有无 X」：§14b"),
+    ("动名词宾语后置「X之能V」", re.compile("[」）]之能(?!立|力|量)" + _H), "作「能V X」：§0.3(d)"),
+]
+
+
+def word_order_hits(zh: str):
+    """[(类别, 片段, 改法)]：汉译中的藏式语序硬句型。"""
+    out = []
+    for name, pat, fix in WORD_ORDER_PATTERNS:
+        for m in pat.finditer(zh):
+            out.append((name, zh[max(0, m.start() - 6):m.end() + 1], fix))
+    return out
+
+
 # ---------- 翻译记忆 ----------
 
 _tm_cache = None
