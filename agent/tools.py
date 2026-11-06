@@ -184,6 +184,7 @@ def lookup_dict(word: str, compact=True):
 # ---------- 术语表 ----------
 
 _glossary_cache = None
+_user_tier = set()    # 出处含「用户」或「校订本」者：用户本人定过译名（回流时用户译法变动即提醒）
 _user_ruled = set()   # 出处明写「用户」的词头（load_glossary 时填）：错配体检不以旧校正版采用率质疑之
 
 
@@ -202,6 +203,7 @@ def load_glossary():
         groups = {}   # bo -> [GlossEntry…]（同层内按文件行序，越后越新）
         seq = 0
         _user_ruled.clear()
+        _user_tier.clear()
         for gf in _cfg()["glossary"]:
             if not gf.exists():
                 continue
@@ -226,6 +228,8 @@ def load_glossary():
                 groups.setdefault(bo, []).append(_gloss_entry(zh, freq, src, seq))
                 if "用户" in src:
                     _user_ruled.add(bo)
+                if "用户" in src or "校订本" in src:
+                    _user_tier.add(bo)
         resolved = ((bo, _resolve_gloss(es)) for bo, es in groups.items() if es)
         _glossary_cache = {bo: v for bo, v in resolved if v is not None}
     return _glossary_cache

@@ -76,9 +76,16 @@ def main():
             print(f"   第{ln}行 「{ch}」 …{ctx}…")
 
     unadopted = unadopted_terms(par)
-    if unadopted:                               # 用户未加「」、却一贯改掉的用字（如 འབྲེལ་བ 相属→关联），靠此显形
-        print(f"⚠ 强制术语本段未被校正版采用 {len(unadopted)} 处（排除错配后，同词多次不同者问用户：语境之便还是新定译）：")
-        for bo, zh, ctx in unadopted[:30]:
+    tools.load_glossary()
+    drift = [u for u in unadopted if u[0] in tools._user_tier]
+    other = [u for u in unadopted if u[0] not in tools._user_tier]
+    if drift:                                   # 用户本人前后译法不一（含固定词）→ 提醒用户以何为准，不默认以最新覆盖
+        print(f"⚑ 与用户此前定译不同 {len(drift)} 处（提醒用户：以哪个为准？排除错配后再问）：")
+        for bo, zh, ctx in drift[:30]:
+            print(f"   {bo} 此前定「{zh}」 ‖ 本段校正版：…{ctx}…")
+    if other:                                   # 用户未加「」、却一贯改掉的用字（如 འབྲེལ་བ 相属→关联），靠此显形
+        print(f"⚠ 强制术语本段未被校正版采用 {len(other)} 处（排除错配后，同词多次不同者问用户：语境之便还是新定译）：")
+        for bo, zh, ctx in other[:30]:
             print(f"   {bo} →「{zh}」 ‖ 校正版：…{ctx}…")
 
     print("① 对齐入译例")
