@@ -17,7 +17,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import tmlib  # noqa: E402
+import tmlib
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'agent'))
+import tools  # noqa: E402
 
 ROOT = tmlib.ROOT
 STASH = ROOT / "review/_机器直译稿留存"
@@ -32,6 +34,26 @@ def half_width_hits(par: Path):
         for m in re.finditer(r"[,;:!?()]", l):
             hits.append((i, m.group(), l[max(0, m.start() - 8):m.start() + 6]))
     return hits
+
+
+def unadopted_terms(par: Path):
+    """校正版里「强制术语未被采用」者：[(藏文, 强制译名, 用户句片段)]，同词只列首见。
+    回流原只收「」所标术语，用户未加引号而一贯改掉的普通用字（6.17 前 འབྲེལ་བ 相属→关联 31 次）从未回流；
+    逐段列出，令每次改字都可见。错配（子串误配）亦会列出，判断时一并排除。"""
+    seen, out = set(), []
+    lines = [l.strip() for l in par.read_text(encoding="utf-8").splitlines() if l.strip()]
+    for bo, zh in zip(lines, lines[1:]):
+        if not tools._has_bo(bo) or tools._has_han(bo) or not tools._has_han(zh):
+            continue
+        for t, z, _f, multi in tools.scan_glossary(bo):
+            if multi or t in seen:
+                continue
+            alts = tools.term_alts(z)
+            if alts and not any(a in zh for a in alts):
+                seen.add(t)
+                core = tools._CORE_CUT.split(z, 1)[0]
+                out.append((t, core, zh[:40]))
+    return out
 
 
 def main():
@@ -52,6 +74,12 @@ def main():
         print(f"⚠ 校正版汉译行有 {len(halfw)} 处半角标点（应全角）：")
         for ln, ch, ctx in halfw[:10]:
             print(f"   第{ln}行 「{ch}」 …{ctx}…")
+
+    unadopted = unadopted_terms(par)
+    if unadopted:                               # 用户未加「」、却一贯改掉的用字（如 འབྲེལ་བ 相属→关联），靠此显形
+        print(f"⚠ 强制术语本段未被校正版采用 {len(unadopted)} 处（逐条判断：收新译名／改按语境／属错配）：")
+        for bo, zh, ctx in unadopted[:30]:
+            print(f"   {bo} →「{zh}」 ‖ 校正版：…{ctx}…")
 
     print("① 对齐入译例")
     out = tmlib.align_one(par, a.project)

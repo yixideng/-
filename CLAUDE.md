@@ -154,6 +154,7 @@ python3 pipeline/reflow.py review/gzhanstong_<段>_<题>_parallel.txt \
   **语序病**〔`tools.word_order_hits`：「五蕴一一」「之有无」「X之能V」等硬句型，校正版上 0 误报〕·**语序差**〔用字重合−相似度＝调次序的改动量〕）。
   语序规则（文风 §0.3＋指令铁律⑨）是否生效，看这两列逐段走势，不凭印象。
   基线：品五末至品六 11 段平均相似度 0.57（用户约改 43% 字）。改流水线/换模型后以此对比。
+- **未加「」的一贯改字**：`reflow.py` 开头列出本段「强制术语未被校正版采用」者（附用户句），逐条判：收新译名／改按语境／属错配。曾因只收「」所标术语，`འབྲེལ་བ` 相属→关联（用户改 31 次）从未回流。
 - **新收术语必验**：`python3 pipeline/audit_glossary.py --check-src <段>校正版`——历史校正版采用率低＝把本段语境译法泛化成全书强制，改「按语境」多义（6.15 曾收 `ལོགས་སུ`→另外 而历史 1/17）。
 - **术语体检**：`python3 pipeline/audit_glossary.py`（报告）/`--apply`（落盘）——以全部校正版实测强制术语命中率，
   低命中自动条目降「参考」（不进资料包）、中命中改「多义·非强制」；**用户裁定永不降级**。
@@ -178,7 +179,7 @@ python3 pipeline/reflow.py review/gzhanstong_<段>_<题>_parallel.txt \
 ## 改动流水线后（自检）
 
 ```bash
-python3 -m unittest discover tests      # 回归测试 56 项：术语择优·失败发声·词典选词·IDF检索·质检·润色对齐·法义节选·错配体检·分段资料·语序质检…
+python3 -m unittest discover tests      # 回归测试 58 项：术语择优·失败发声·词典选词·IDF检索·质检·润色对齐·法义节选·错配体检·分段资料·语序质检…
 python3 pipeline/audit_glossary.py      # 术语体检（强制术语在校正版上的命中率）
 python3 pipeline/audit_notes.py         # 笔记体检（专项规则触发词：漏触发/死触发/废止无取代）
 python3 pipeline/audit_glossary.py --conflicts   # 一词多译词头如何取舍（透明报告）

@@ -494,3 +494,22 @@ class TestWordOrderQA(unittest.TestCase):
     def test_zero_false_positive_on_user_corpus(self):
         n = sum(len(tools.word_order_hits(zh)) for _bo, zh in tools.parallel_pairs())
         self.assertEqual(n, 0)
+
+
+class TestReflowUnadopted(unittest.TestCase):
+    """回流列出「强制术语未被校正版采用」者——治「未加「」的一贯改字从不回流」（འབྲེལ་བ 相属→关联）。"""
+
+    def test_lists_unadopted_forced_term(self):
+        import tempfile, reflow
+        tools._glossary_cache = None
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "x_parallel.txt"
+            p.write_text("སེམས་ཅན་རྣམས་ཀྱིས་ཤེས་སོ། །\n诸众生知之。\n", encoding="utf-8")
+            hits = reflow.unadopted_terms(p)
+        self.assertTrue(any(h[0] == "སེམས་ཅན" and h[1] == "有情" for h in hits))
+
+    def test_relation_ruled_as_guanlian(self):
+        tools._glossary_cache = None
+        g = tools.load_glossary()
+        self.assertEqual(tools._CORE_CUT.split(g["འབྲེལ་བ"][0], 1)[0], "关联")
+        self.assertTrue(g["བདག་གཅིག་འབྲེལ"][0].startswith("同体相属"))   # 因明固定词仍由长条保留
