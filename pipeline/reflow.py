@@ -77,7 +77,7 @@ def main():
 
     unadopted = unadopted_terms(par)
     if unadopted:                               # 用户未加「」、却一贯改掉的用字（如 འབྲེལ་བ 相属→关联），靠此显形
-        print(f"⚠ 强制术语本段未被校正版采用 {len(unadopted)} 处（逐条判断：收新译名／改按语境／属错配）：")
+        print(f"⚠ 强制术语本段未被校正版采用 {len(unadopted)} 处（排除错配后，同词多次不同者问用户：语境之便还是新定译）：")
         for bo, zh, ctx in unadopted[:30]:
             print(f"   {bo} →「{zh}」 ‖ 校正版：…{ctx}…")
 
