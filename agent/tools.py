@@ -397,8 +397,15 @@ def parallel_pairs():
                     yield l, lines[j]
 
 
+_MID_PAREN = re.compile(r"^([\u4e00-\u9fff]+)（([^（）]+)）([\u4e00-\u9fff]+)")
+
+
 def term_alts(zh: str):
-    """术语汉译的核心异写（「A／B（注）」→[A, B]），判断译名是否落地用。"""
+    """术语汉译的核心异写（「A／B（注）」→[A, B]），判断译名是否落地用。
+    括注夹在词中者（「声（名言）共相」）整词计：[声（名言）共相, 声共相]，免截成单字「声」而恒算落地。"""
+    m = _MID_PAREN.match(zh)
+    if m:
+        return [m.group(0), m.group(1) + m.group(3)]
     core = _CORE_CUT.split(zh, 1)[0]
     return [a for a in (x.strip(" 「」『』") for x in re.split(r"[／/、，,]", core)) if a]
 

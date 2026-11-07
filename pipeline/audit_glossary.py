@@ -45,9 +45,7 @@ def parallel_pairs():
 
 
 def core_alts(zh: str):
-    core = tools._CORE_CUT.split(zh, 1)[0]
-    alts = [a.strip(" 「」『』") for a in re.split(r"[／/、，,]", core)]
-    return [a for a in alts if a]
+    return tools.term_alts(zh)
 
 
 def audit():

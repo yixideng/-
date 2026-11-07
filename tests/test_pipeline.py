@@ -513,3 +513,9 @@ class TestReflowUnadopted(unittest.TestCase):
         g = tools.load_glossary()
         self.assertEqual(tools._CORE_CUT.split(g["འབྲེལ་བ"][0], 1)[0], "关联")
         self.assertTrue(g["བདག་གཅིག་འབྲེལ"][0].startswith("同体相属"))   # 因明固定词仍由长条保留
+
+
+class TestMidParenTerm(unittest.TestCase):
+    def test_mid_paren_term_not_cut_to_single_char(self):
+        self.assertEqual(tools.term_alts("声（名言）共相（用户暂定）"), ["声（名言）共相", "声共相"])
+        self.assertEqual(tools.term_alts("行相（执取相）（注）"), ["行相"])
