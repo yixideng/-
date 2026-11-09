@@ -231,7 +231,9 @@ def load_glossary():
                 if "用户" in src or "校订本" in src:
                     _user_tier.add(bo)
         resolved = ((bo, _resolve_gloss(es)) for bo, es in groups.items() if es)
-        _glossary_cache = {bo: v for bo, v in resolved if v is not None}
+        # 单音节词头义多随语境（སྒྲ 声｜字、རྒྱུན 相续｜不断），一律作多义提示、不强制
+        _glossary_cache = {bo: (v if "་" in bo else (v[0], v[1], True))
+                           for bo, v in resolved if v is not None}
     return _glossary_cache
 
 
@@ -343,12 +345,39 @@ def scan_glossary_spans(bo_text: str, max_len=8):
                 if scand in g:
                     matched, adv = scand, l     # 消费原始 l 个音节（含格助词）
                     break
+        if not matched:                         # 单音节词头（ནོག 峰·སྤྱིར 一般…）：曾因 l≥2 永不命中而静默失效
+            matched = _single_hit(syls, brk, i, g)
+            adv = 1
         if matched:
             hits.append((i, adv, matched))
             i += adv
         else:
             i += 1
     return hits
+
+
+_SUFFIX_LETTERS = set("གངདནབམའརལས")
+
+
+def _single_hit(syls, brk, i, g):
+    """单音节命中：须是术语表单音节词头（或其黏着格助词形），且不是词典复合词之一截
+    （སྲོག་ཆགས 有情≠命根、རྒྱུན་དུ 恒常≠相续）。单音节条目一律按多义提示（见 load_glossary）。"""
+    w = syls[i]
+    cand = w if w in g else None
+    if cand is None:
+        st = _stem_glued([w])
+        # 黏着格助词只接开音节（སྒྲས→སྒྲ）；剥后以后加字收尾者为误拆（ནོགས≠ནོག＋ས）
+        if st and st[0] in g and not (len(st[0]) > 1 and st[0][-1] in _SUFFIX_LETTERS):
+            cand = st[0]
+    if cand is None:
+        return None
+    hw = _headwords()
+    for j, l in ((i, 2), (i, 3), (i - 1, 2), (i - 2, 3)):
+        if j < 0 or j + l > len(syls) or crosses(brk, j, l):
+            continue
+        if "་".join(syls[j:j + l]) in hw:
+            return None
+    return cand
 
 
 def scan_glossary(bo_text: str, max_len=8):

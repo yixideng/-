@@ -519,3 +519,28 @@ class TestMidParenTerm(unittest.TestCase):
     def test_mid_paren_term_not_cut_to_single_char(self):
         self.assertEqual(tools.term_alts("声（名言）共相（用户暂定）"), ["声（名言）共相", "声共相"])
         self.assertEqual(tools.term_alts("行相（执取相）（注）"), ["行相"])
+
+
+class TestSingleSyllableTerms(unittest.TestCase):
+    """单音节词头曾因扫描 l≥2 永不命中（ནོག 峰·སྤྱིར 一般 等 14 条用户/校订本条目静默失效）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        tools._glossary_cache = None
+        cls.g = tools.load_glossary()
+
+    def hits(self, bo):
+        return [h[0] for h in tools.scan_glossary(bo)]
+
+    def test_single_syllable_headword_hits_as_multi(self):
+        self.assertIn("ནོག", self.hits("རྭ་དང་ནོག་ལྡན་པ།"))
+        self.assertTrue(self.g["ནོག"][2])               # 单音节一律多义提示、不强制
+
+    def test_not_cut_from_dictionary_compound(self):
+        hs = self.hits("སྲོག་ཆགས་ཐམས་ཅད། རྒྱུན་དུ་སྒོམ།")
+        self.assertNotIn("སྲོག", hs)                    # སྲོག་ཆགས 有情 ≠ 命根
+        self.assertNotIn("རྒྱུན", hs)                    # རྒྱུན་དུ 恒常 ≠ 相续
+
+    def test_glued_particle_only_on_open_syllable(self):
+        self.assertIn("སྒྲ", self.hits("སྒྲས་བརྗོད།"))     # སྒྲས → སྒྲ
+        self.assertNotIn("ནོག", self.hits("ནོགས་པ།"))     # ནོགས ≠ ནོག＋ས

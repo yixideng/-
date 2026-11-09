@@ -166,7 +166,7 @@ python3 pipeline/reflow.py review/gzhanstong_<段>_<题>_parallel.txt \
 **术语择优（`agent/tools.py` `load_glossary`·恒常）**：同一藏文词多条时按权威分层——
 用户裁定/校订本 ＞ 人工校正 ＞ 自动抽取 ＞ 参考；只一核心译名→强制；最高层单一定名且无「语境」标注→强制（替换型纠正）；
 否则列入「多义词」栏全部义项、不强制；纯自动条目间若次高译名频次≥最高之半（五五开），亦列多义不强制。故**新增裁定的出处列须写「用户裁定」或「校订本」字样**，
-多义按语境分者在汉译列注明「按语境」。
+多义按语境分者在汉译列注明「按语境」。**单音节词头**（ནོག 峰·སྤྱིར 一般·དོན 义｜事）一律作多义提示、不强制，且为词典复合词之一截者不报（སྲོག་ཆགས≠སྲོག 命根）；曾因扫描只认 ≥2 音节而 14 条静默失效。
 
 
 **笔记以效果为主·去冗余（用户裁定·恒常）**：目标不是守住字数，而是**每条规则都要真起作用、没有重复**。
@@ -183,7 +183,7 @@ python3 pipeline/reflow.py review/gzhanstong_<段>_<题>_parallel.txt \
 ## 改动流水线后（自检）
 
 ```bash
-python3 -m unittest discover tests      # 回归测试 59 项：术语择优·失败发声·词典选词·IDF检索·质检·润色对齐·法义节选·错配体检·分段资料·语序质检…
+python3 -m unittest discover tests      # 回归测试 62 项：术语择优·失败发声·词典选词·IDF检索·质检·润色对齐·法义节选·错配体检·分段资料·语序质检·单音节词头…
 python3 pipeline/audit_glossary.py      # 术语体检（强制术语在校正版上的命中率）
 python3 pipeline/audit_notes.py         # 笔记体检（专项规则触发词：漏触发/死触发/废止无取代）
 python3 pipeline/audit_glossary.py --conflicts   # 一词多译词头如何取舍（透明报告）
