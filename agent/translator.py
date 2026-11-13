@@ -537,6 +537,28 @@ def _fullwidth_cn(text: str) -> str:
     return "\n".join(out)
 
 
+_CLASSICAL_MAP = {"；": "，", "：": "，", "？": "。", "！": "。"}
+
+
+def _classical_punct(text: str) -> str:
+    """古文体标点（用户裁定·6.21）：译文正文只用 ，。 与 「」『』（并沿用校正版实测常用之 、（）〈〉《》）；
+    ；：？！—— 一律转为 ，。（品六 6.15–6.19 校正版：；0 ：≤1 ？≤1 ！0，机器稿每段 ；20+ ：10–28）。
+    只动含汉字之正文行；文末「校勘」等注记节、藏文行不动。"""
+    body, tail = _split_tail(text)
+    def is_cjk(c): return 0x4E00 <= ord(c) <= 0x9FFF
+    out = []
+    for ln in body.splitlines():
+        if any(is_cjk(c) for c in ln) and not any(0x0F00 <= ord(c) <= 0x0FFF for c in ln):
+            ln = re.sub(r"[—―]{1,2}", "，", ln)
+            ln = "".join(_CLASSICAL_MAP.get(c, c) for c in ln)
+            ln = re.sub(r"，{2,}", "，", ln)
+            ln = re.sub(r"，([。」』）])", r"\1", ln)
+            ln = re.sub(r"([「『（，。])，", r"\1", ln)
+        out.append(ln)
+    body = "\n".join(out)
+    return body + ("\n\n" + tail if tail else "")
+
+
 def _split_tail(text: str):
     """切出正文与文末『校勘/校订/译注/按语』节（后者原样保留、不参与段级对齐）。"""
     lines = text.splitlines()
@@ -756,8 +778,8 @@ def main():
                 raw_p.write_text(polished + "\n", encoding="utf-8")
                 print(f"（润色原稿另存 {raw_p}，供诊断）", file=sys.stderr)
 
-    out = _fullwidth_cn(out)          # 译文定稿一律中文全角标点（用户裁定·恒常）
-    draft = _fullwidth_cn(draft)
+    out = _classical_punct(_fullwidth_cn(out))     # 全角标点＋古文体（只用，。「」『』等·用户裁定）
+    draft = _classical_punct(_fullwidth_cn(draft))
     if USAGE:
         tot_in = sum(u["in"] for u in USAGE); tot_out = sum(u["out"] for u in USAGE)
         print(f"（本次合计：{len(USAGE)} 次调用·输入 {tot_in:,} token·输出 {tot_out:,}·"

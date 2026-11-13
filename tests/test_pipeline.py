@@ -544,3 +544,21 @@ class TestSingleSyllableTerms(unittest.TestCase):
     def test_glued_particle_only_on_open_syllable(self):
         self.assertIn("སྒྲ", self.hits("སྒྲས་བརྗོད།"))     # སྒྲས → སྒྲ
         self.assertNotIn("ནོག", self.hits("ནོགས་པ།"))     # ནོགས ≠ ནོག＋ས
+
+
+class TestClassicalPunct(unittest.TestCase):
+    """古文体标点（用户裁定·6.21）：正文只用 ，。「」『』（及 、（）〈〉《》）；；：？！—— 转 ，。"""
+
+    def test_converts_modern_marks(self):
+        self.assertEqual(tr._classical_punct("彼等答云：「诸微尘相邻而住。」问：然则如何见色？"),
+                         "彼等答云，「诸微尘相邻而住。」问，然则如何见色。")
+        self.assertEqual(tr._classical_punct("则作者——第二刹那之眼自身——未生故无；是故不能。"),
+                         "则作者，第二刹那之眼自身，未生故无，是故不能。")
+
+    def test_keeps_allowed_and_tail(self):
+        src = "青、黄等行相（指色）〈注〉，《中论》云「无生」。\n\n## 校勘\n- 段1：疑讹；待定？"
+        self.assertEqual(tr._classical_punct(src), src)
+
+    def test_tibetan_line_untouched(self):
+        bo = "དེ་ལྟར་ན། ཅི་སྟེ།"
+        self.assertEqual(tr._classical_punct(bo), bo)

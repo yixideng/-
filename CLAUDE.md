@@ -8,7 +8,7 @@
 
 它不是一个常驻服务，而是「脚本 + 数据」。翻译时运行 `agent/translator.py`，
 它会自动：分段 → 查四部词典（按优先级）→ 套用术语表（分层择优·强制或多义提示）→ 检索相似历史译例
-→ **注入笔记层（法义通则＋相关纪要 / 句法通则＋触发专项 / 文风）** → 交给 Claude 出直译 → 润色 → 全角规范化。详见 `PLAN.md` 与 `pipeline/README.md`。
+→ **注入笔记层（法义通则＋相关纪要 / 句法通则＋触发专项 / 文风）** → 交给 Claude 出直译 → 润色 → 全角规范化＋古文体标点（正文只用，。「」『』、（）〈〉《》，不用；：？！——·用户裁定）。详见 `PLAN.md` 与 `pipeline/README.md`。
 
 ## 查词优先级（用户裁定·恒常·防词义飘移）
 
@@ -183,7 +183,7 @@ python3 pipeline/reflow.py review/gzhanstong_<段>_<题>_parallel.txt \
 ## 改动流水线后（自检）
 
 ```bash
-python3 -m unittest discover tests      # 回归测试 62 项：术语择优·失败发声·词典选词·IDF检索·质检·润色对齐·法义节选·错配体检·分段资料·语序质检·单音节词头…
+python3 -m unittest discover tests      # 回归测试 65 项：术语择优·失败发声·词典选词·IDF检索·质检·润色对齐·法义节选·错配体检·分段资料·语序质检·单音节词头·古文体标点…
 python3 pipeline/audit_glossary.py      # 术语体检（强制术语在校正版上的命中率）
 python3 pipeline/audit_notes.py         # 笔记体检（专项规则触发词：漏触发/死触发/废止无取代）
 python3 pipeline/audit_glossary.py --conflicts   # 一词多译词头如何取舍（透明报告）
