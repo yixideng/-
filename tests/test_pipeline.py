@@ -559,6 +559,11 @@ class TestClassicalPunct(unittest.TestCase):
         src = "青、黄等行相（指色）〈注〉，《中论》云「无生」。\n\n## 校勘\n- 段1：疑讹；待定？"
         self.assertEqual(tr._classical_punct(src), src)
 
+    def test_keeps_doubt_marker(self):
+        # 6.22 首跑曾把存疑标记（？）转成（。）
+        self.assertEqual(tr._classical_punct("现量缘尽无生智（？）者；彼云：有。"),
+                         "现量缘尽无生智（？）者，彼云，有。")
+
     def test_tibetan_line_untouched(self):
         bo = "དེ་ལྟར་ན། ཅི་སྟེ།"
         self.assertEqual(tr._classical_punct(bo), bo)

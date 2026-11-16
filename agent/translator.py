@@ -549,8 +549,10 @@ def _classical_punct(text: str) -> str:
     out = []
     for ln in body.splitlines():
         if any(is_cjk(c) for c in ln) and not any(0x0F00 <= ord(c) <= 0x0FFF for c in ln):
+            ln = ln.replace("（？）", "\x00")      # 存疑标记（？）保留（铁律「把握不足处以（？）标出」）
             ln = re.sub(r"[—―]{1,2}", "，", ln)
             ln = "".join(_CLASSICAL_MAP.get(c, c) for c in ln)
+            ln = ln.replace("\x00", "（？）")
             ln = re.sub(r"，{2,}", "，", ln)
             ln = re.sub(r"，([。」』）])", r"\1", ln)
             ln = re.sub(r"([「『（，。])，", r"\1", ln)
