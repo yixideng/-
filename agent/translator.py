@@ -726,7 +726,7 @@ def main():
     ap.add_argument("--allow-missing", action="store_true",
                     help="资源（字典/译例/术语/笔记）缺失时仍强行运行（默认缺失即报错退出）")
     ap.add_argument("--project", default="gzhanstong",
-                    help="翻译项目：gzhanstong(胜乘中观·默认) / kalacakra(时轮根本续)。"
+                    help="翻译项目：gzhanstong(胜乘中观·默认) / jonang(觉囊祖师论著·整本·共用胜乘中观全部设置) / kalacakra(时轮根本续)。"
                          "决定注入哪套笔记/译例/术语覆盖层；两本词典与共享术语库始终共用")
     args = ap.parse_args()
 

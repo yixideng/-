@@ -58,6 +58,17 @@ PROJECTS = {
         "tm": _GZHANSTONG_TM,
         "notes": [ROOT / "notes/法义.md", ROOT / "notes/句法.md", ROOT / "notes/文风.md"],
         "review": ROOT / "review",
+        "review_glob": "gzhanstong_*.txt",
+    },
+    # 觉囊派祖师论著·整本翻译（不回流）——与胜乘中观共用全部笔记（法义·句法·文风）、译例、术语库与校正版统计；
+    # 只另设术语覆盖层（可选·书中专名）与产出目录 projects/jonang/books/
+    "jonang": {
+        "name": "觉囊派祖师论著（整本翻译·共用胜乘中观全部设置）",
+        "glossary": [SHARED_GLOSSARY, ROOT / "projects/jonang/glossary.tsv"],
+        "tm": _GZHANSTONG_TM,
+        "notes": [ROOT / "notes/法义.md", ROOT / "notes/句法.md", ROOT / "notes/文风.md"],
+        "review": ROOT / "review",
+        "review_glob": "gzhanstong_*.txt",
     },
     # 时轮根本续——独立笔记/译例/术语覆盖层；共享 SHARED_GLOSSARY(只读)与两本词典
     "kalacakra": {
@@ -413,8 +424,7 @@ def _has_han(s): return any(0x4E00 <= ord(c) <= 0x9FFF for c in s)
 def parallel_pairs():
     """当前项目全部用户校正版平行文的 (藏文行, 汉译行)。"""
     rv = _cfg()["review"]
-    files = sorted(rv.glob("gzhanstong_*.txt")) if PROJECT == "gzhanstong" else \
-        sorted(rv.glob("*_parallel.txt"))
+    files = sorted(rv.glob(_cfg().get("review_glob", "*_parallel.txt")))
     for p in files:
         lines = [l.strip() for l in p.read_text(encoding="utf-8").splitlines()]
         for i, l in enumerate(lines):

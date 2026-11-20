@@ -567,3 +567,31 @@ class TestClassicalPunct(unittest.TestCase):
     def test_tibetan_line_untouched(self):
         bo = "དེ་ལྟར་ན། ཅི་སྟེ།"
         self.assertEqual(tr._classical_punct(bo), bo)
+
+
+class TestBookChunking(unittest.TestCase):
+    """整本翻译切块：按空行段累积；超长段只在整句末断开；不丢字。"""
+    def setUp(self):
+        import translate_book as tb
+        self.tb = tb
+
+    def test_paragraphs_accumulate_and_keep_text(self):
+        par = "ཀ་ཁ་ག་ང་ཡིན་ནོ། །" * 50
+        text = "\n\n".join([par] * 6)
+        chunks = self.tb.chunk_text(text, limit=len(par) * 2)
+        self.assertGreater(len(chunks), 1)
+        self.assertEqual(sum(self.tb._bo_len(c) for c in chunks), self.tb._bo_len(text))  # 常规段原样保留
+
+    def test_long_paragraph_splits_at_sentence_end(self):
+        sent = "དེ་ནི་ཆོས་ཀྱི་དབྱིངས་ཡིན་ནོ།"
+        par = " ".join([sent] * 400)
+        chunks = self.tb.chunk_text(par, limit=1000)
+        self.assertGreater(len(chunks), 3)
+        for c in chunks:
+            self.assertTrue(c.rstrip().endswith("ནོ།"))
+
+    def test_jonang_shares_gzhanstong_settings(self):
+        j, g = tools.PROJECTS["jonang"], tools.PROJECTS["gzhanstong"]
+        self.assertEqual(j["notes"], g["notes"])
+        self.assertEqual(j["tm"], g["tm"])
+        self.assertEqual(j["glossary"][0], g["glossary"][0])

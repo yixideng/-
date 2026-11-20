@@ -38,6 +38,7 @@
 
 已建项目：
 - **`gzhanstong`（默认）**＝胜乘中观(他空大中观)：沿用 `notes/` `review/` `glossary/glossary.tsv` 与 `data/processed/tm_gzhanstong_*`。**不带 --project 时行为与原来完全一致。**
+- **`jonang`**＝觉囊派祖师论著·**整本翻译、不校正回流**：与 `gzhanstong` **共用全部设置**（法义·句法·文风笔记、译例、术语库、校正版统计），只另有术语覆盖层 `projects/jonang/glossary.tsv`（可选）与产出目录 `projects/jonang/books/<书名>/`。用法见下节「整本翻译」。
 - **`kalacakra`**＝时轮根本续：`projects/kalacakra/{notes,review,source_texts,glossary.tsv}`，译例存 `data/processed/tm_kalacakra_*`。共享词典与术语库，但笔记/译例/新术语独立。
 
 用法：`python3 agent/translator.py --project kalacakra --file 待译.txt --out 译文.md`
@@ -62,6 +63,20 @@
 节的生命周期：用户裁定者直接生效（不需「两次印证」）；仅由 diff 归纳、用户未表态者标 `<!-- 状态：观察 -->`；
 被取代者标 `<!-- 状态：废止｜取代：§N -->`（不注入，原文留档）。`python3 pipeline/audit_notes.py` 体检：
 触发词在其来源段/自身例句上是否命中（漏触发）、是否从不触发（死触发）、废止有无取代者，并列疑重复条目。
+
+## 整本翻译（`jonang` 项目·新会话专用·不回流）
+
+用户在**另开的会话**里整本翻译觉囊派祖师论著，与本论（`gzhanstong`）逐段校正回流的工作并行。做法：
+
+1. 先跑 `python3 pipeline/rebuild.py`（同下节）。
+2. 用户给的整本藏文原文**原样**存为 `projects/jonang/待译/<书名>.txt`（自然段以空行分隔为佳）。
+3. 先试切估价：`python3 pipeline/translate_book.py --book projects/jonang/待译/<书名>.txt --name <书名> --dry-run`
+   （报块数与预估费用，约 $0.2/千藏文字符）；**告知用户费用后再开译**。可先 `--limit 2` 试译两块给用户看文风。
+4. 正式译：同命令去掉 `--dry-run`，用后台 Bash 跑（长任务）；**断点续跑**——已译块跳过，失败块重跑即补。
+5. 产出（进 Git）：`<书名>_全译.md`（藏汉对照）、`<书名>_汉文.md`（只汉文）、`<书名>_质检汇总.md`、`chunks/`（逐块原文/译文/直译/质检/日志）。
+   每译完若干块即 `git add projects/jonang && git commit && git pull --no-rebase origin main && git push origin HEAD:main`（另一会话也在推 main，**推前必拉取合并**）。
+6. 规矩：**只写 `projects/jonang/`**，不改共享的 `notes/`、`glossary/glossary.tsv`、`review/`（那是本论会话的回流资产）；书中专名可记入 `projects/jonang/glossary.tsv`。
+   发现流水线缺陷（非译文问题）可修代码，但须跑回归测试并告知用户。不回流、不写校订本、不做逐段问答式交付；交付＝全书文件＋质检汇总要点。
 
 ## 会话开始时：一键重建（容器是临时的）
 
@@ -183,7 +198,7 @@ python3 pipeline/reflow.py review/gzhanstong_<段>_<题>_parallel.txt \
 ## 改动流水线后（自检）
 
 ```bash
-python3 -m unittest discover tests      # 回归测试 66 项：术语择优·失败发声·词典选词·IDF检索·质检·润色对齐·法义节选·错配体检·分段资料·语序质检·单音节词头·古文体标点…
+python3 -m unittest discover tests      # 回归测试 69 项：术语择优·失败发声·词典选词·IDF检索·质检·润色对齐·法义节选·错配体检·分段资料·语序质检·单音节词头·古文体标点…
 python3 pipeline/audit_glossary.py      # 术语体检（强制术语在校正版上的命中率）
 python3 pipeline/audit_notes.py         # 笔记体检（专项规则触发词：漏触发/死触发/废止无取代）
 python3 pipeline/audit_glossary.py --conflicts   # 一词多译词头如何取舍（透明报告）
