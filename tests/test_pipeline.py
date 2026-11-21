@@ -595,3 +595,11 @@ class TestBookChunking(unittest.TestCase):
         self.assertEqual(j["notes"], g["notes"])
         self.assertEqual(j["tm"], g["tm"])
         self.assertEqual(j["glossary"][0], g["glossary"][0])
+
+
+class TestLineSeparator(unittest.TestCase):
+    def test_u2028_does_not_split_sentence(self):
+        t = "ཁྱབ་པའི་དོན་དམ་ <སྙིང་པོ་ཡེ་ཤེས་>གཉིས་སོ། །དང་པོ་ནི་ཡིན་ནོ།"
+        segs = tr.split_segments(t)
+        self.assertEqual(len(segs), 1)
+        self.assertNotIn(" ", segs[0])

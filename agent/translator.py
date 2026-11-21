@@ -89,8 +89,11 @@ def split_segments(text: str, max_shad=16):
     旧版按固定 shad 数硬切，会把『…གཞི་བྱེད་པའི་ཕྱིར། │ སྣོད་དང་མཚུངས་པ་ཡིན…སོ།』
     在 ཕྱིར 处腰斩，谓语「与器相似」被甩到下段成残句；故彻底改为自然段优先。"""
     segs = []
+    # 粘贴文本常夹 U+2028（行分隔符·不可见）——splitlines 会据以断段而腰斩句子（7.2「ཁྱབ་པའི་དོན་དམ་ │ <སྙིང་པོ…>གཉིས་སོ」）；
+    # 视作空格。U+2029（段分隔符）才作换行。
+    text = text.replace("\u2028", " ").replace("\u2029", "\n")
     # 原文换行是作者给的自然段边界，优先采信；无换行则整体为一块
-    blocks = [b.strip() for b in text.splitlines() if b.strip()] or [text]
+    blocks = [b.strip() for b in text.split("\n") if b.strip()] or [text]
     carry = []                                # 上段末尾的科判标题，挪到本段开头（标题领起其下正文）
     for block in blocks:
         parts = carry + _shad_clauses(block)
