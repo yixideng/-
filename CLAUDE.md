@@ -38,7 +38,7 @@
 
 已建项目：
 - **`gzhanstong`（默认）**＝胜乘中观(他空大中观)：沿用 `notes/` `review/` `glossary/glossary.tsv` 与 `data/processed/tm_gzhanstong_*`。**不带 --project 时行为与原来完全一致。**
-- **`jonang`**＝觉囊派祖师论著·**整本翻译、不校正回流**：与 `gzhanstong` **共用全部设置**（法义·句法·文风笔记、译例、术语库、校正版统计），只另有术语覆盖层 `projects/jonang/glossary.tsv`（可选）与产出目录 `projects/jonang/books/<书名>/`。用法见下节「整本翻译」。
+- **`jonang`**＝觉囊派祖师论著·**整本翻译、不校正回流**：**轻量模式（用户裁定·2026-11）：以模型自身学识为主、资料为辅**——自有指令副本 `projects/jonang/prompts/`、笔记只留 `projects/jonang/notes/法义护栏.md`（摘自法义一～四、六）、仅用户裁定术语强制（余作参考）、一遍出稿不润色、偈颂四句一颂切段、梵文转写去长音查词；共用译例与共享术语库（只读）。开关见 `agent/tools.py` `PROJECTS["jonang"]`，**删去 lite 诸键即恢复原设置**；原项目一概不受影响（回归测试守护）。用法见下节「整本翻译」。
 - **`kalacakra`**＝时轮根本续：`projects/kalacakra/{notes,review,source_texts,glossary.tsv}`，译例存 `data/processed/tm_kalacakra_*`。共享词典与术语库，但笔记/译例/新术语独立。
 
 用法：`python3 agent/translator.py --project kalacakra --file 待译.txt --out 译文.md`

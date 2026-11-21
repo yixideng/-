@@ -73,7 +73,7 @@ def _is_heading(sent) -> bool:
         and not any(_sentence_end(c) for c in sent) and len(sent) <= 4
 
 
-def split_segments(text: str, max_shad=16):
+def split_segments(text: str, max_shad=16, verse=False):
     """分段：**以原文自然段（换行）为单位，一段=一组对照**。
     单段整体保留（含段内「…ཡིན་ནོ། །ཞེས་པ…པའོ།」这类中途句号＋收束句），
     不因段内的句号而拆——与用户校订本「根颂／释论各自成组」的排版一致。
@@ -106,6 +106,9 @@ def split_segments(text: str, max_shad=16):
             nxt = parts[i + 1] if i + 1 < len(parts) else ""
             if _sentence_end(p) and not _QUOTE_HEAD.match(nxt):
                 sentences.append(cur)
+                cur = []
+            elif verse and len(cur) >= 4 and not _QUOTE_HEAD.match(nxt):
+                sentences.append(cur)         # 偈颂（轻量模式）：无终结词时按四句一颂断，免整节成「一句」
                 cur = []
         if cur:                               # 末尾无终结词的残句自成一句
             sentences.append(cur)
@@ -326,9 +329,12 @@ def scan_morph(text: str, glo, dict_hits):
 
 
 def build_packet(text: str, missing=None) -> str:
-    segs = split_segments(text)
+    lite = tools.opt("lite", False)
+    segs = (split_segments(text, tools.opt("max_shad", 8), verse=True) if tools.opt("verse_split")
+            else split_segments(text))
     lines = []
-    lines.append(PROMPT_FILE.read_text(encoding="utf-8"))
+    for pf in tools.opt("prompt", [PROMPT_FILE]):   # 项目可另指指令副本（轻量模式）；未设＝原指令
+        lines.append(pf.read_text(encoding="utf-8"))
     if missing:
         lines.append("\n> ⚠ **资料缺失**：" + "；".join(missing) +
                      "。本次词典/译例等可能为空——遇无据之词须在校勘中标明「无词典依据」，勿凭空定名。\n")
@@ -345,7 +351,7 @@ def build_packet(text: str, missing=None) -> str:
                     rep += f"·逐段纪要节选 {m.group(1)}"
             NOTE_REPORT.append(rep)
             lines.append("\n---\n" + body)
-    lines.insert(1, "\n> 〔笔记注入：" + "；".join(NOTE_REPORT) + "〕\n")
+    lines.insert(len(tools.opt("prompt", [PROMPT_FILE])), "\n> 〔笔记注入：" + "；".join(NOTE_REPORT) + "〕\n")
     lines.append("\n---\n## 待译原文（共 %d 段）\n" % len(segs))
     for i, s in enumerate(segs, 1):
         lines.append(f"[段{i}] {s}")
@@ -358,23 +364,30 @@ def build_packet(text: str, missing=None) -> str:
     covered = {g[0] for gl in seg_glo for g in gl}
     seg_dict = [scan_dict(s, covered) for s in segs]
     pick = pick_dict_hits([h for sd in seg_dict for h in sd])
-    seg_morph = [scan_morph(s, seg_glo[k], seg_dict[k]) for k, s in enumerate(segs)]
+    seg_morph = ([[] for _ in segs] if lite else   # 轻量模式不列逐字参考（单字义模型自知，列之反生误导）
+                 [scan_morph(s, seg_glo[k], seg_dict[k]) for k, s in enumerate(segs)])
     n_dict = len({w for sd in seg_dict for w, _ in sd})
     lines.append("\n## 分段资料（每段只列本段命中者）\n")
-    lines.append("- **术语约束**＝必须采用的译法；标 ⚠疑错配 者先核本句：若该词在此实为更长词之一截、"
-                 "或属语境专用之裁定而本句语境不合，按文义译，并在校勘一句带过。")
-    lines.append("- **多义词**＝依语境择一，非强制；判别线索见括号。")
-    lines.append("- **词典释义**＝参考；取义优先级：藏汉大辞典＞格西曲扎＞瑜伽师地论词汇表＞宝性论大疏词汇表；"
-                 "同词多典义项相异时，以靠前者〔尤藏汉大辞典〕为准，余典作旁参，勿随后典飘移。"
-                 "同一词只在首见之段列出。")
-    lines.append("- **逐字参考**＝复合词未成词条时，供逐字合成；非强制，仅作原料。")
-    lines.append("- **参考译例**＝同一译者已定稿译本，模仿其文体。")
+    if lite:
+        lines.append("- **术语约束**＝审定译者亲自裁定的译名，原文出现即采用；标 ⚠疑错配 者先核本句，不合则按文义译、校勘一句带过。")
+        lines.append("- **参考译名**＝旁参，按语境自由取舍。")
+        lines.append("- **词典释义**＝旁参（藏汉大辞典居首）；资料无者依你自身学识。同一词只在首见之段列出。")
+        lines.append("- **参考译例**＝另一部他空论著（胜乘中观）的定稿，只供常用词译名参照，勿模仿其句式内容。")
+    else:
+        lines.append("- **术语约束**＝必须采用的译法；标 ⚠疑错配 者先核本句：若该词在此实为更长词之一截、"
+                     "或属语境专用之裁定而本句语境不合，按文义译，并在校勘一句带过。")
+        lines.append("- **多义词**＝依语境择一，非强制；判别线索见括号。")
+        lines.append("- **词典释义**＝参考；取义优先级：藏汉大辞典＞格西曲扎＞瑜伽师地论词汇表＞宝性论大疏词汇表；"
+                     "同词多典义项相异时，以靠前者〔尤藏汉大辞典〕为准，余典作旁参，勿随后典飘移。"
+                     "同一词只在首见之段列出。")
+        lines.append("- **逐字参考**＝复合词未成词条时，供逐字合成；非强制，仅作原料。")
+        lines.append("- **参考译例**＝同一译者已定稿译本，模仿其文体。")
     dict_seen, morph_seen, n_morph = set(), set(), 0
     for k, seg in enumerate(segs):
         lines.append(f"\n### 段{k + 1} 资料\n")
         fixed = [g for g in seg_glo[k] if not g[3]]
         multi = [g for g in seg_glo[k] if g[3]]
-        lines.append("**术语约束（必须采用）**")
+        lines.append("**术语约束（用户裁定·采用）**" if lite else "**术语约束（必须采用）**")
         if fixed:
             for bo, zh, freq, _ in fixed:
                 warn = f"　⚠疑错配：{seg_flag[k][bo]}" if bo in seg_flag[k] else ""
@@ -382,7 +395,7 @@ def build_packet(text: str, missing=None) -> str:
         else:
             lines.append("（本段未命中术语表）")
         if multi:
-            lines.append("\n**多义词（依语境择一）**")
+            lines.append("\n**参考译名（旁参·依语境取舍）**" if lite else "\n**多义词（依语境择一）**")
             for bo, zh, _, _ in multi:
                 lines.append(f"- {bo} → {zh}")
         dl = []
@@ -719,7 +732,7 @@ def main():
     ap.add_argument("--text")
     ap.add_argument("--file", type=Path)
     ap.add_argument("--packet", action="store_true", help="只输出资料包，不调用模型")
-    ap.add_argument("--polish", action=argparse.BooleanOptionalAction, default=True,
+    ap.add_argument("--polish", action=argparse.BooleanOptionalAction, default=None,
                     help="翻译后再跑一遍『文风润色』（默认开；--no-polish 关）。两阶段：准确直译→定稿体润色")
     ap.add_argument("--out", type=Path)
     ap.add_argument("--model", default="")
@@ -731,6 +744,8 @@ def main():
     args = ap.parse_args()
 
     tools.set_project(args.project)   # 切项目：选定 notes/tm/术语覆盖层（默认不改变原行为）
+    if args.polish is None:           # 未显式指定：依项目（轻量模式默认一遍出稿），其余项目照旧默认润色
+        args.polish = tools.opt("polish", True)
 
     text = args.text or (args.file.read_text(encoding="utf-8") if args.file else None)
     if not text:
@@ -780,8 +795,9 @@ def main():
                 raw_p.write_text(polished + "\n", encoding="utf-8")
                 print(f"（润色原稿另存 {raw_p}，供诊断）", file=sys.stderr)
 
-    out = _classical_punct(_fullwidth_cn(out))     # 全角标点＋古文体（只用，。「」『』等·用户裁定）
-    draft = _classical_punct(_fullwidth_cn(draft))
+    punct = _fullwidth_cn if tools.opt("punct") == "modern" else (lambda t: _classical_punct(_fullwidth_cn(t)))
+    out = punct(out)     # 全角标点＋古文体（只用，。「」『』等·用户裁定）；项目可设 punct="modern" 只做全角
+    draft = punct(draft)
     if USAGE:
         tot_in = sum(u["in"] for u in USAGE); tot_out = sum(u["out"] for u in USAGE)
         print(f"（本次合计：{len(USAGE)} 次调用·输入 {tot_in:,} token·输出 {tot_out:,}·"

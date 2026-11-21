@@ -62,13 +62,23 @@ PROJECTS = {
     },
     # 觉囊派祖师论著·整本翻译（不回流）——与胜乘中观共用全部笔记（法义·句法·文风）、译例、术语库与校正版统计；
     # 只另设术语覆盖层（可选·书中专名）与产出目录 projects/jonang/books/
+    # 轻量模式（用户裁定·2026-11）：以模型自身学识为主、资料为辅。原系统规则一概不动，只在本项目改指向：
+    #   prompt 指令副本·notes 只留法义护栏·force_only_user 仅用户裁定术语强制·polish 默认关（一遍出稿）·
+    #   verse_split 偈颂按 shad 句切段·dict_skt_fallback 梵文转写去长音再查。
+    #   **恢复原规则**：删去下列 lite 诸键、notes 改回 notes/ 三件即可（或 git 回退本段）。
     "jonang": {
-        "name": "觉囊派祖师论著（整本翻译·共用胜乘中观全部设置）",
+        "name": "觉囊派祖师论著（整本翻译·轻量模式：模型学识为主、资料为辅）",
         "glossary": [SHARED_GLOSSARY, ROOT / "projects/jonang/glossary.tsv"],
         "tm": _GZHANSTONG_TM,
-        "notes": [ROOT / "notes/法义.md", ROOT / "notes/句法.md", ROOT / "notes/文风.md"],
+        "notes": [ROOT / "projects/jonang/notes/法义护栏.md"],
         "review": ROOT / "review",
         "review_glob": "gzhanstong_*.txt",
+        "prompt": [ROOT / "projects/jonang/prompts/translate.md", ROOT / "projects/jonang/prompts/文体.md"],
+        "force_only_user": True,
+        "polish": False,
+        "verse_split": True,
+        "dict_skt_fallback": True,
+        "lite": True,
     },
     # 时轮根本续——独立笔记/译例/术语覆盖层；共享 SHARED_GLOSSARY(只读)与两本词典
     "kalacakra": {
@@ -99,6 +109,11 @@ def set_project(name: str):
 
 def _cfg():
     return PROJECTS[PROJECT]
+
+
+def opt(key, default=None):
+    """当前项目的可选开关（未设＝原行为）。"""
+    return _cfg().get(key, default)
 
 
 def project_notes():
@@ -183,6 +198,14 @@ def lookup_dict(word: str, compact=True):
                     results += _query_db(db, stem)
                 if results:
                     break
+    if not results and opt("dict_skt_fallback") and "ཱ" in key:
+        # 梵文转写（སྭཱ་སྟི）：词典词头多不带长音符、音节不隔（སྭསྟི）——去长音、合音节再查
+        bare = key.replace("ཱ", "")
+        for cand in (bare, bare.replace("་", "")):
+            for _, db in DICT_DBS:
+                results += _query_db(db, cand)
+            if results:
+                break
     # 按查词优先级稳定排序：主辞典（藏汉大辞典）义项恒居首，余典依次旁参（防飘移）。
     results.sort(key=lambda r: DICT_PRIORITY.get(r["source"], _DICT_PRIORITY_FALLBACK))
     if compact:
@@ -245,6 +268,9 @@ def load_glossary():
         # 单音节词头义多随语境（སྒྲ 声｜字、རྒྱུན 相续｜不断），一律作多义提示、不强制
         _glossary_cache = {bo: (v if "་" in bo else (v[0], v[1], True))
                            for bo, v in resolved if v is not None}
+        if opt("force_only_user"):   # 轻量模式：只有用户裁定/校订本者强制，余皆作参考（非强制）
+            _glossary_cache = {bo: (v if bo in _user_tier else (v[0], v[1], True))
+                               for bo, v in _glossary_cache.items()}
     return _glossary_cache
 
 

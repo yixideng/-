@@ -590,8 +590,30 @@ class TestBookChunking(unittest.TestCase):
         for c in chunks:
             self.assertTrue(c.rstrip().endswith("ནོ།"))
 
-    def test_jonang_shares_gzhanstong_settings(self):
+    def test_jonang_lite_mode_isolated(self):
+        """jonang 轻量模式：共用译例与共享术语库，另用自己的指令/笔记；原项目不带任何 lite 开关。"""
         j, g = tools.PROJECTS["jonang"], tools.PROJECTS["gzhanstong"]
-        self.assertEqual(j["notes"], g["notes"])
         self.assertEqual(j["tm"], g["tm"])
         self.assertEqual(j["glossary"][0], g["glossary"][0])
+        self.assertTrue(all("projects/jonang" in str(n) for n in j["notes"] + j["prompt"]))
+        for name in ("gzhanstong", "kalacakra"):
+            for k in ("prompt", "force_only_user", "polish", "verse_split", "dict_skt_fallback", "lite", "punct"):
+                self.assertNotIn(k, tools.PROJECTS[name])
+
+    def test_lite_force_only_user_and_skt_fallback(self):
+        try:
+            tools.set_project("jonang")
+            g = tools.load_glossary()
+            forced = [b for b, v in g.items() if not v[2]]
+            self.assertTrue(forced and all(b in tools._user_tier for b in forced))
+            self.assertTrue(tools.lookup_dict("སྭཱ་སྟི"))       # 梵文转写去长音再查 → སྭསྟི
+            tools.set_project("gzhanstong")
+            self.assertFalse(tools.lookup_dict("སྭཱ་སྟི"))      # 原项目行为不变
+        finally:
+            tools.set_project("gzhanstong")
+
+    def test_verse_split_only_when_asked(self):
+        line = "ཀ་ཁ་ག་ང་ཅ་ཆ་ཇ། །"
+        par = line * 12
+        self.assertEqual(len(tr.split_segments(par)), 1)                # 原行为：无终结词整段一句
+        self.assertEqual(len(tr.split_segments(par, 8, verse=True)), 2)  # 偈颂：四句一颂，两颂一段
