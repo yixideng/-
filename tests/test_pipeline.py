@@ -597,7 +597,7 @@ class TestBookChunking(unittest.TestCase):
         self.assertEqual(j["glossary"][0], g["glossary"][0])
         self.assertTrue(all("projects/jonang" in str(n) for n in j["notes"] + j["prompt"]))
         for name in ("gzhanstong", "kalacakra"):
-            for k in ("prompt", "force_only_user", "polish", "verse_split", "dict_skt_fallback", "lite", "punct", "prose_join"):
+            for k in ("prompt", "force_only_user", "polish", "verse_split", "dict_skt_fallback", "lite", "punct", "prose_join", "ref_terms_user_only", "dict_max", "tm_k", "tm_min"):
                 self.assertNotIn(k, tools.PROJECTS[name])
 
     def test_lite_force_only_user_and_skt_fallback(self):

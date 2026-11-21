@@ -250,7 +250,7 @@ def pick_dict_hits(dict_hits) -> set:
     罕见词才最需词典。"""
     corpus = tools.tm_corpus()
     words = list(dict.fromkeys(w for w, _ in dict_hits))      # 去重（同词多段命中只算一次）
-    return set(sorted(words, key=corpus.count)[:DICT_MAX])
+    return set(sorted(words, key=corpus.count)[:tools.opt("dict_max", DICT_MAX)])
 
 
 def _dict_line(word, entries):
@@ -387,6 +387,8 @@ def build_packet(text: str, missing=None) -> str:
         lines.append(f"\n### 段{k + 1} 资料\n")
         fixed = [g for g in seg_glo[k] if not g[3]]
         multi = [g for g in seg_glo[k] if g[3]]
+        if tools.opt("ref_terms_user_only"):    # 参考译名只留用户裁定/校订本者（自动抽取者不列）
+            multi = [g for g in multi if g[0] in tools._user_tier]
         lines.append("**术语约束（用户裁定·采用）**" if lite else "**术语约束（必须采用）**")
         if fixed:
             for bo, zh, freq, _ in fixed:
@@ -417,7 +419,8 @@ def build_packet(text: str, missing=None) -> str:
         if ml:
             lines.append("\n**逐字参考**")
             lines += ml
-        tm = [ex for ex in tools.search_tm(seg, k=2) if ex["score"] >= tools.TM_MIN_SCORE]
+        tm = [ex for ex in tools.search_tm(seg, k=tools.opt("tm_k", 2))
+              if ex["score"] >= tools.opt("tm_min", tools.TM_MIN_SCORE)]
         if tm:
             lines.append("\n**参考译例**")
             for ex in tm:
