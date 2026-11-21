@@ -79,6 +79,8 @@ PROJECTS = {
         "verse_split": True,
         "dict_skt_fallback": True,
         "lite": True,
+        "punct": "modern",          # 本书放开现代标点（用户裁定·2026-11）；未设＝古文体
+        "prose_join": True,         # 汉文本按科判整节连排（散文·自动换行）
     },
     # 时轮根本续——独立笔记/译例/术语覆盖层；共享 SHARED_GLOSSARY(只读)与两本词典
     "kalacakra": {

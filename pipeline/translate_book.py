@@ -108,7 +108,9 @@ def main():
         done += 1
 
     # 合并
+    tr.tools.set_project(a.project)
     body, tails, zh, qa, fails, usd = [], [], [], [], [], 0.0
+    zh_head = False
     for i in range(1, len(chunks) + 1):
         dst = cdir / f"{i:03d}_译文.md"
         log = cdir / f"{i:03d}.log"
@@ -119,7 +121,22 @@ def main():
         body.append(b)
         if t:
             tails.append(f"### 第 {i} 块\n\n{t}")
-        zh.extend(ln for ln in b.splitlines() if ln.strip() and not _BO.search(ln))
+        if tr.tools.opt("prose_join"):
+            # 散文连排：科判标题（藏文行以「༄」起）自成一段，其下各组汉译接成一整段，不按对照组分行
+            for bo, grp in tr._bo_pairs(b):
+                bo_ln = grp.splitlines()[0].strip()
+                head = bo_ln.startswith("༄") and len(bo_ln) < 150   # 短的「༄」行＝书题/科判；长者为正文起首
+                txt = "".join(ln.strip() for ln in grp.splitlines()[1:] if ln.strip() and not _BO.search(ln))
+                if not txt:
+                    continue
+                if head or not zh:
+                    zh.append(txt); zh_head = head
+                elif zh_head:
+                    zh.append(txt); zh_head = False
+                else:
+                    zh[-1] += txt
+        else:
+            zh.extend(ln for ln in b.splitlines() if ln.strip() and not _BO.search(ln))
         q = dst.with_name(dst.stem + "_质检" + dst.suffix)
         if q.exists():
             items = [ln for ln in q.read_text(encoding="utf-8").split("\n## ")[0].splitlines()
